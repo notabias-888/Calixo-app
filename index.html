@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Calixo v9</title>
+<title>Calixo v10</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#030303">
 <meta name="mobile-web-app-capable" content="yes">
@@ -648,6 +648,13 @@ body.is-offline #offlineBanner{display:block;}
           oninput="ms.customHours=parseFloat(this.value)||0">
       </div>
     </div>
+    <div id="statusHrsRow" style="display:none;margin-top:8px;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:10px;color:var(--muted);white-space:nowrap;min-width:54px;">Stunden</span>
+        <input type="number" id="statusHrsInput" step="0.5" min="0" max="24" placeholder="Std. (optional)"
+          style="flex:1;background:var(--s3);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit;text-align:center;">
+      </div>
+    </div>
     <div class="divider">— oder Hotel —</div>
     <div id="hotelSec">
       <div class="hcity-tabs" id="hotelCityTabs" style="display:none;"></div>
@@ -913,7 +920,7 @@ body.is-offline #offlineBanner{display:block;}
 
 <script>
 // ══ CONSTANTS ══════════════════════════════════════════════════════════════
-const APP_VERSION = 9;
+const APP_VERSION = 10;
 
 // ══ STORAGE & SYNC ARCHITECTURE ════════════════════════════════════════════
 // ── Crypto: isolated encryption boundary ─────────────────────────────────────
@@ -1168,7 +1175,7 @@ let _newCityTemplate = null;   // source cityId for template copy (null = blank)
 // undo/redo
 let undoStack = [];
 let redoStack = [];
-const MAX_HISTORY = 50;
+const MAX_HISTORY = 25;
 
 function saveSnapshot() {
   undoStack.push(JSON.stringify(appData));
@@ -1851,7 +1858,7 @@ function renderTable() {
 
       const tdH=document.createElement('td'); tdH.className='td-hours'+(we?' we-bg':'');
       if(si.len>1 && si.pos<si.len-1) tdH.classList.add('span-inner');
-      if(e&&(!e.status||(e.status==='Custom'&&e.hours))){
+      if(e&&(!e.status||e.hours)){
         const hrs=e.hours||0;
         const hCell=document.createElement('div'); hCell.className='hrs-cell';
         const dec=document.createElement('span'); dec.className='hrs-side hrs-dec'; dec.textContent='−0.5';
@@ -1909,7 +1916,7 @@ function refreshHoursCell(emp, day) {
   if (!td) { renderTable(); return; }
   // Rebuild cell content (mirrors the logic in renderTable).
   td.innerHTML = '';
-  if (e && (!e.status || (e.status === 'Custom' && e.hours))) {
+  if (e && (!e.status || e.hours)) {
     const hrs  = e.hours || 0;
     const hCell = document.createElement('div'); hCell.className = 'hrs-cell';
     const dec   = document.createElement('span'); dec.className = 'hrs-side hrs-dec'; dec.textContent = '−0.5';
@@ -2021,6 +2028,7 @@ function openShift(emp, day) {
   document.getElementById('customColSwatch').style.background = savedColor;
   document.getElementById('customTimeInput').value = e.customTime || '';
   document.getElementById('customHrsInput').value = (e.status==='Custom' && e.hours) ? e.hours : '';
+  document.getElementById('statusHrsInput').value  = ((e.status==='Urlaub'||e.status==='Krank') && e.hours) ? e.hours : '';
   setOpacityUI(savedOpacity);
   refreshShift();
   document.getElementById('shiftOv').classList.add('open');
@@ -2035,6 +2043,7 @@ function refreshShift(){
   document.getElementById('stKrank').className  ='stbtn'+(ms.status==='Krank'?  ' sel-krank':'');
   document.getElementById('stCustom').className ='stbtn'+(ms.status==='Custom'? ' sel-custom':'');
   document.getElementById('customLabelRow').style.display = ms.status==='Custom' ? 'block' : 'none';
+  document.getElementById('statusHrsRow').style.display   = (ms.status==='Urlaub'||ms.status==='Krank') ? 'block' : 'none';
   document.getElementById('hotelSec').style.opacity=ms.status?'.35':'1';
   document.getElementById('hotelSec').style.pointerEvents=ms.status?'none':'all';
 }
@@ -2064,7 +2073,9 @@ function saveShift(){
             customOpacity:ms.customOpacity??1,
             customTime:(ms.customTime||'').trim(),
             hours:parseFloat(document.getElementById('customHrsInput').value)||0 }
-        : {status:ms.status})
+        : (ms.status==='Urlaub'||ms.status==='Krank')
+            ? {status:ms.status, hours:parseFloat(document.getElementById('statusHrsInput').value)||0}
+            : {status:ms.status})
     : {hotel:ms.hotel, shift:ms.shift, hours:parseFloat(document.getElementById('mHrs').value)||8};
   // remember custom color for this label
   if (ms.status==='Custom' && val.customLabel) {
