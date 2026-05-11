@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Calixo v7</title>
+<title>Calixo v9</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#030303">
 <meta name="mobile-web-app-capable" content="yes">
@@ -913,25 +913,143 @@ body.is-offline #offlineBanner{display:block;}
 
 <script>
 // ══ CONSTANTS ══════════════════════════════════════════════════════════════
-const APP_VERSION = 7;
+const APP_VERSION = 9;
 
-// ══ STORAGE & SYNC ══════════════════════════════════════════════════════════
-// Storage: unified persistence interface — swap out layers without touching callers
+// ══ STORAGE & SYNC ARCHITECTURE ════════════════════════════════════════════
+// ── Crypto: isolated encryption boundary ─────────────────────────────────────
+// All crypto operations go through this module.
+// Separating it from persist() lets us swap key derivation or add per-entry
+// encryption in v9+ without touching the rest of the codebase.
+const Crypto = {
+  ALGORITHM: 'AES-GCM',
+  KEY_VERSION: 1,              // bump when key derivation params change
+  async wrap(data, key)   { return encrypt(data, key); },   // full-blob encrypt
+  async unwrap(blob, key) { return decrypt(blob, key); },   // full-blob decrypt
+  // Future: wrapEntry(entry, key) / unwrapEntry(blob, key) for per-entry mode
+};
+
+// ── Storage: unified persistence interface ────────────────────────────────────
+// Callers use Storage.save(); the real work is in persist() via IndexedDB.
+// Swapping the storage backend (Electron, server-side) only requires changing this object.
 const Storage = {
   async save(data) {
-    // Primary: IndexedDB (encrypted) — handled by persist() below
-    // Future: Electron fs / Supabase realtime
-    return; // no-op: persist() is the real implementation
+    // Primary path: IndexedDB encrypted blob — handled by persist() below.
+    // Future: Electron fs.writeFile / server-side blob backup.
+    return; // persist() is the canonical implementation; this stub is for layered callers.
   }
 };
 
-// SyncQueue: no-op stub — wire to Supabase realtime in v7+
-const SyncQueue = {
-  push(op) {
-    // op: {city, emp, year, month, day, val}
-    // Future: batch + flush to supabase.from('entries').upsert(...)
+// ── SyncQueue: granular operation log ────────────────────────────────────────
+// Records every mutation as a structured op. Used by the Supabase sync layer (v9).
+// Replaces the old no-op stub with a real in-memory queue + drain/flush interface.
+const SyncQueue = (() => {
+  const _ops = [];   // pending ops accumulated since last flush
+
+  function push(op) {
+    // Stamp and enqueue: {city, emp, year, month, day, val, queuedAt}
+    _ops.push({ ...op, queuedAt: Date.now() });
+    // v9: auto-flush on online event (see window 'online' listener below)
   }
+
+  function drain() {
+    // Return all pending ops and clear the queue. Called by flush().
+    return _ops.splice(0, _ops.length);
+  }
+
+  function flush() {
+    // Trigger sync of pending ops to Supabase.
+    // No-op until Supabase client is wired in v9.
+    // Future: if (_ops.length > 0 && navigator.onLine) Supabase.upsertBatch(drain());
+  }
+
+  function size()  { return _ops.length; }       // diagnostic / badge counter
+  function peek()  { return [..._ops]; }          // read-only snapshot
+
+  return { push, drain, flush, size, peek };
+})();
+
+// ── Supabase: clean integration boundary ─────────────────────────────────────
+// ALL remote sync goes through this object. Nothing else touches the network.
+// Currently a no-op stub; wire up in v9 by replacing the method bodies.
+const Supabase = {
+  _client: null,          // supabase-js client instance (set in v9 init)
+  _realtimeSub: null,     // active realtime subscription handle
+
+  // v9: init('https://xxx.supabase.co', 'anon-key')
+  init(url, anonKey) { /* no-op until v9 */ },
+
+  // v9: upsert a single entry row (called from setEntry via SyncQueue)
+  async upsertEntry(op) { /* no-op until v9 */ },
+
+  // v9: upsert a batch of entries (called on reconnect flush)
+  async upsertBatch(ops) { /* no-op until v9 */ },
+
+  // v9: subscribe to realtime broadcasts from other logged-in users
+  subscribeRealtime(onEntry) { /* no-op until v9 */ },
+
+  // Apply a remote entry received via realtime — last-write-wins merge into appData.
+  // Does NOT call SyncQueue.push() (no echo-loop) and does NOT call persist()
+  // (the next local mutation will persist the merged state automatically).
+  applyRemoteEntry(op) {
+    if (!appData) return;
+
+    // Fix 4: defer if user is actively editing — retry after 500ms.
+    // Remote events are idempotent and LWW-safe, so the delay is harmless.
+    if (isInteracting()) {
+      setTimeout(() => Supabase.applyRemoteEntry(op), 500);
+      return;
+    }
+
+    const c = appData.cities[op.city];
+    if (!c) return;
+    const s = c.schedule;
+    if (!s[op.year])               s[op.year] = {};
+    if (!s[op.year][op.month])     s[op.year][op.month] = {};
+    if (!s[op.year][op.month][op.emp]) s[op.year][op.month][op.emp] = {};
+    const existing = s[op.year][op.month][op.emp][op.day];
+
+    // Fix 5: proper LWW comparison — deletions carry deletedAt (set by setEntry),
+    // upserts carry updatedAt. Both are compared against the local entry's updatedAt.
+    // Old code had `!op.val` which unconditionally applied all remote deletions,
+    // potentially overwriting newer local data.
+    const remoteTs = op.val?.updatedAt || op.deletedAt || 0;
+    const localTs  = existing?.updatedAt || 0;
+    if (remoteTs >= localTs) {
+      if (op.val === null) { delete s[op.year][op.month][op.emp][op.day]; }
+      else                 { s[op.year][op.month][op.emp][op.day] = op.val; }
+
+      // Refresh visible cell while preserving selection state (Fix 6)
+      if (op.city === activeCityId && op.year === curYear && op.month === curMonth) {
+        const cellKey   = op.emp + '|||' + op.day;
+        const wasSel    = selectedCells.has(cellKey);
+        refreshHoursCell(op.emp, op.day);
+        updateTotals();
+        // Restore sel-cell class that DOM rebuild may have removed
+        if (wasSel) {
+          const el = document.querySelector(`[data-selkey="${CSS.escape(cellKey)}"]`);
+          if (el) el.classList.add('sel-cell');
+        }
+      }
+    }
+  },
 };
+// ── schedulePersist: microtask-debounced persist coalescer (Fix 1) ───────────
+// Coalesces rapid synchronous calls (bulk paste, swap, multi-select, clear-sel)
+// into a single IndexedDB write on the next microtask checkpoint.
+// ONLY setEntry() uses this. All other callers that need immediate persistence
+// (undo/redo, structural ops) call persist() directly.
+let _persistScheduled = false;
+function schedulePersist() {
+  if (_persistScheduled) return;
+  _persistScheduled = true;
+  // Promise.resolve() fires at end of current synchronous execution block,
+  // before the next browser paint — perfect for coalescing N setEntry() calls.
+  Promise.resolve().then(() => {
+    _persistScheduled = false;
+    persist();
+  });
+}
+
 const MONTHS = ["Januar","Februar","März","April","Mai","Juni",
                 "Juli","August","September","Oktober","November","Dezember"];
 const DAYS   = ["So","Mo","Di","Mi","Do","Fr","Sa"];
@@ -1069,6 +1187,9 @@ function undo() {
   appData = JSON.parse(undoStack.pop());
   activeCityId = appData.activeCityId || Object.keys(appData.cities)[0];
   selectedCells.clear(); if (selMode) { selMode=false; document.querySelector('.tbl-wrap')?.classList.remove('sel-active'); }
+  // Fix 3: undo is LOCAL ONLY — discard queued ops that now conflict with rolled-back state.
+  // Without this, a subsequent SyncQueue.flush() would push the un-done changes to Supabase.
+  SyncQueue.drain();
   persist(); render(); updateUndoBtns(); updateSelBar();
 }
 function redo() {
@@ -1077,6 +1198,8 @@ function redo() {
   appData = JSON.parse(redoStack.pop());
   activeCityId = appData.activeCityId || Object.keys(appData.cities)[0];
   selectedCells.clear(); if (selMode) { selMode=false; document.querySelector('.tbl-wrap')?.classList.remove('sel-active'); }
+  // Fix 3: redo is LOCAL ONLY — discard any ops queued before the redo was applied.
+  SyncQueue.drain();
   persist(); render(); updateUndoBtns(); updateSelBar();
 }
 
@@ -1180,6 +1303,7 @@ async function doSetup() {
   const cityId = 'c_' + Date.now();
   appData = {
     version: APP_VERSION,
+    syncVersion: 1,        // T6: sync protocol version (for future Supabase migration)
     cities: { [cityId]: {
       name: 'München',
       cityKey: 'münchen',
@@ -1314,6 +1438,9 @@ function migrate(data) {
       }
     }
   });
+  // v8: add syncVersion — tracks sync protocol version; no structural data change
+  if (data.syncVersion === undefined) data.syncVersion = 1;
+  // v9: no structural change — mutation pipeline (schedulePersist, drain, LWW fixes) is code-only
   data.version = APP_VERSION;
   return data;
 }
@@ -1345,12 +1472,15 @@ function setEntry(emp, day, val){
   if (!s[curYear][curMonth][emp]) s[curYear][curMonth][emp] = {};
   if (val===null) {
     delete s[curYear][curMonth][emp][day];
+    // Fix 2: stamp deletedAt so remote LWW can compare deletion ops by time
+    SyncQueue.push({city:activeCityId, emp, year:curYear, month:curMonth, day, val:null, deletedAt:Date.now()});
   } else {
     val.updatedAt = Date.now();
     s[curYear][curMonth][emp][day] = val;
+    SyncQueue.push({city:activeCityId, emp, year:curYear, month:curMonth, day, val});
   }
-  SyncQueue.push({city:activeCityId, emp, year:curYear, month:curMonth, day, val});
-  persist();
+  // Fix 1: coalesce N persist() calls from bulk ops into one microtask write
+  schedulePersist();
 }
 
 function daysInMonth(y,m) { return new Date(y,m+1,0).getDate(); }
@@ -1759,6 +1889,40 @@ function updateTotals(){
   });
 }
 
+// ── refreshHoursCell: targeted hours-row update (Task 3 — render modularisation) ──
+// Rebuilds the td-hours cell for one (emp, day) without re-rendering the whole table.
+// Safe ONLY when e.hours changed but the shift type / hotel did NOT change.
+// Callers: adjustHours(), startHrsEdit() commit.
+// Falls back to renderTable() if the cell cannot be located in the DOM.
+function refreshHoursCell(emp, day) {
+  const e   = entry(emp, day);
+  const ei  = employeeIds().indexOf(emp);
+  if (ei < 0) { renderTable(); return; }
+  const tbody = document.querySelector('#tbl tbody');
+  if (!tbody)  { renderTable(); return; }
+  // Each employee occupies 2 tbody rows (shift row + hours row).
+  // The hours row is at index ei*2 + 1; the sum row is at the very end.
+  const hoursRow = tbody.rows[ei * 2 + 1];
+  if (!hoursRow) { renderTable(); return; }
+  // Hours row cells: one <td> per calendar day (no name col, no total col).
+  const td = hoursRow.cells[day - 1];
+  if (!td) { renderTable(); return; }
+  // Rebuild cell content (mirrors the logic in renderTable).
+  td.innerHTML = '';
+  if (e && (!e.status || (e.status === 'Custom' && e.hours))) {
+    const hrs  = e.hours || 0;
+    const hCell = document.createElement('div'); hCell.className = 'hrs-cell';
+    const dec   = document.createElement('span'); dec.className = 'hrs-side hrs-dec'; dec.textContent = '−0.5';
+    const val   = document.createElement('span'); val.className = 'hrs-val' + (hrs ? '' : ' empty-val'); val.textContent = hrs ? hrs : '–';
+    const inc   = document.createElement('span'); inc.className = 'hrs-side hrs-inc'; inc.textContent = '+0.5';
+    dec.onclick    = ev => { ev.stopPropagation(); adjustHours(emp, day, -0.5); };
+    inc.onclick    = ev => { ev.stopPropagation(); adjustHours(emp, day, +0.5); };
+    val.ondblclick = ev => { ev.stopPropagation(); startHrsEdit(td, emp, day); };
+    hCell.appendChild(dec); hCell.appendChild(val); hCell.appendChild(inc);
+    td.appendChild(hCell);
+  }
+}
+
 // ══ INTERACTION GUARD ══════════════════════════════════════════════════════
 function isInteracting() {
   // True while user is drag-selecting or has any modal open.
@@ -1774,7 +1938,9 @@ function adjustHours(emp, d, delta) {
   const newVal = Math.max(0, Math.min(24, parseFloat((+(cur.hours||0) + delta).toFixed(1))));
   cur.hours = newVal;
   setEntry(emp, d, cur);
-  renderTable();
+  // T4: targeted update — only hours changed, no span recalculation needed
+  refreshHoursCell(emp, d);
+  updateTotals();
 }
 function startHrsEdit(tdH, emp, d) {
   const cur = entry(emp, d); if (!cur) return;
@@ -1786,7 +1952,8 @@ function startHrsEdit(tdH, emp, d) {
   const commit = () => {
     const c = entry(emp, d); if (!c) return;
     saveSnapshot(); c.hours = parseFloat(inp.value)||0; setEntry(emp, d, c);
-    renderTable();
+    // T4: targeted update — only hours changed
+    refreshHoursCell(emp, d); updateTotals();
   };
   inp.onblur = commit;
   inp.onkeydown = ev => { if(ev.key==='Enter') inp.blur(); if(ev.key==='Escape'){ renderTable(); } };
@@ -2176,11 +2343,12 @@ function renderTableSettings(){
 
 // ══ EXPORT / IMPORT ════════════════════════════════════════════════════════
 function exportJSON(){
-  const out={lk_version:APP_VERSION, exported_at:new Date().toISOString(), ...appData};
+  // T6: calixo_version is the canonical version field; lk_version kept for import back-compat
+  const out={calixo_version:APP_VERSION, lk_version:APP_VERSION, exported_at:new Date().toISOString(), ...appData};
   const blob=new Blob([JSON.stringify(out,null,2)],{type:'application/json'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
-  a.download=`LK_Backup_${new Date().toISOString().slice(0,10)}.json`;
+  a.download=`Calixo_Backup_${new Date().toISOString().slice(0,10)}.json`;
   a.click();
 }
 
@@ -2190,10 +2358,15 @@ function importJSON(input){
   reader.onload=async e=>{
     try{
       let data=JSON.parse(e.target.result);
-      data=migrate(data);
+      // T6: guard — must have cities key (rejects unrelated JSON files silently)
+      if (!data || typeof data !== 'object' || !data.cities) {
+        console.warn('[Calixo] importJSON: invalid backup — missing cities key');
+        return;
+      }
+      data=migrate(data);  // handles v1→v8 forward-migration automatically
       appData=data; activeCityId=appData.activeCityId||Object.keys(appData.cities)[0];
       await persist(); render();
-    }catch(err){}
+    }catch(err){ console.warn('[Calixo] importJSON error:', err); }
     input.value='';
   };
   reader.readAsText(file);
@@ -2429,10 +2602,20 @@ async function doImport(){
       });
       // hotels: merge
       Object.assign(ex.hotels, imp.hotels||{});
-      // schedule: imported months overwrite
+      // schedule: imported months overwrite; stamp missing updatedAt so LWW works (Fix 7)
       Object.entries(imp.schedule||{}).forEach(([y,yd])=>{
         if(!ex.schedule[y]) ex.schedule[y]={};
-        Object.entries(yd).forEach(([m,md])=>{ ex.schedule[y][m]=md; });
+        Object.entries(yd).forEach(([m,md])=>{
+          // Ensure every entry in the imported month has a timestamp.
+          // Entries from old backups (pre-v6) may lack updatedAt entirely.
+          const now = Date.now();
+          Object.values(md || {}).forEach(empSched => {
+            Object.values(empSched || {}).forEach(e => {
+              if (e && typeof e === 'object' && !e.updatedAt) e.updatedAt = now;
+            });
+          });
+          ex.schedule[y][m] = md;
+        });
       });
     });
   }
@@ -3158,7 +3341,8 @@ document.addEventListener('keydown',e=>{
 // ── Online / Offline detection ──────────────────────────────────────────────
 window.addEventListener('online',  () => {
   document.body.classList.remove('is-offline');
-  // Future: SyncQueue.flush() — trigger pending sync when back online
+  // T5: flush accumulated ops now that we're back online
+  SyncQueue.flush();
 });
 window.addEventListener('offline', () => document.body.classList.add('is-offline'));
 if (!navigator.onLine) document.body.classList.add('is-offline');
