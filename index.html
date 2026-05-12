@@ -1,0 +1,3645 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calixo v13</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#030303">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Calixo">
+<link rel="apple-touch-icon" href="icon-192.png">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
+<style>
+:root{
+  --bg:#030303;--s1:#0c0c0c;--s2:#141414;--s3:#1e1e1e;--s4:#282828;
+  --border:#2a2a2a;--border2:#1c1c1c;
+  --text:#f0f0f0;--muted:#7a7a7a;--dim:#3a3a3a;--white:#ffffff;
+  --off-bg:#161616;--off-fg:#4a4a4a;
+  --vac-bg:#1c1300;--vac-fg:#d97706;
+  --sick-bg:#160000;--sick-fg:#dc2626;
+  --zoom:1;--cell-w:calc(76px * var(--zoom));--name-w:calc(172px * var(--zoom));--tot-w:calc(62px * var(--zoom));
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',Arial,sans-serif;font-size:13px;height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+
+/* ── AUTH SCREEN ── */
+#authScreen{position:fixed;inset:0;background:var(--bg);z-index:999;display:flex;align-items:center;justify-content:center;}
+.auth-box{background:var(--s1);border:1px solid var(--border);border-radius:16px;padding:36px 32px;width:100%;max-width:360px;box-shadow:0 32px 80px rgba(0,0,0,.9);}
+.auth-logo{font-size:20px;font-weight:800;color:var(--white);margin-bottom:4px;}
+.auth-logo span{color:var(--muted);font-weight:400;}
+.auth-sub{font-size:12px;color:var(--muted);margin-bottom:28px;}
+.auth-label{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;margin-top:16px;display:block;}
+.auth-input{width:100%;background:var(--s3);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:11px 13px;font-size:14px;outline:none;font-family:inherit;}
+.auth-input:focus{border-color:var(--white);}
+.auth-btn{width:100%;margin-top:20px;padding:12px;background:var(--white);color:#030303;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;transition:background .15s;}
+.auth-btn:hover{background:#e0e0e0;}
+.auth-btn:disabled{background:var(--s4);color:var(--muted);cursor:not-allowed;}
+.auth-err{color:var(--sick-fg);font-size:12px;margin-top:10px;min-height:18px;}
+.auth-spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--s4);border-top-color:var(--white);border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── TOPBAR ── */
+.topbar{background:var(--s1);border-bottom:1px solid var(--border);padding:8px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;gap:8px;flex-wrap:wrap;}
+.logo{font-size:14px;font-weight:800;color:var(--white);white-space:nowrap;}
+.logo span{color:var(--muted);font-weight:400;}
+.month-nav{display:flex;align-items:center;gap:5px;}
+.nav-btn{background:var(--s3);border:1px solid var(--border);color:var(--text);width:28px;height:28px;border-radius:5px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;transition:background .15s;}
+.nav-btn i.ti{font-size:15px;}
+.nav-btn:hover{background:var(--s4);}
+.month-label{font-size:13px;font-weight:700;min-width:140px;text-align:center;color:var(--white);}
+.topbar-right{display:flex;gap:5px;flex-wrap:wrap;}
+.btn{padding:6px 12px;border-radius:6px;border:none;cursor:pointer;font-size:11px;font-weight:600;transition:all .15s;white-space:nowrap;}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--muted);}
+.btn-ghost:hover{border-color:var(--white);color:var(--white);}
+.btn-white{background:var(--white);color:#030303;}
+.btn-white:hover{background:#e8e8e8;}
+.btn-danger{background:transparent;border:1px solid var(--sick-fg);color:var(--sick-fg);}
+.btn-danger:hover{background:var(--sick-bg);}
+
+/* ── CITY TABS ── */
+.city-tabs{background:var(--s1);border-bottom:1px solid var(--border2);padding:0 16px;display:flex;align-items:stretch;gap:2px;flex-shrink:0;overflow-x:auto;}
+.city-tab{display:flex;align-items:center;gap:6px;padding:8px 14px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:all .15s;user-select:none;}
+.city-tab:hover{color:var(--text);}
+.city-tab.active{color:var(--white);border-bottom-color:var(--white);}
+.city-tab-del{font-size:10px;color:var(--dim);cursor:pointer;padding:1px 3px;border-radius:3px;transition:color .15s;}
+.city-tab-del:hover{color:var(--sick-fg);}
+.city-add{display:flex;align-items:center;padding:7px 12px;font-size:12px;color:var(--dim);cursor:pointer;transition:color .15s;}
+.city-add:hover{color:var(--white);}
+
+/* ── LEGEND ── */
+.legend-bar{background:var(--s1);border-bottom:1px solid var(--border2);padding:8px 16px;display:flex;align-items:center;gap:9px;flex-shrink:0;flex-wrap:wrap;}
+.legend-lbl{font-size:10px;color:var(--dim);font-weight:700;text-transform:uppercase;letter-spacing:.4px;}
+.legend-item{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted);}
+.legend-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0;}
+.legend-sep{width:1px;height:13px;background:var(--border);margin:0 3px;}
+
+/* ── ZOOM BAR ── */
+.zoombar{background:var(--s1);border-bottom:1px solid var(--border2);padding:8px 16px;display:flex;align-items:center;gap:8px;flex-shrink:0;flex-wrap:wrap;}
+.zoom-btn{background:var(--s3);border:1px solid var(--border);color:var(--text);width:24px;height:24px;border-radius:5px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;}
+.zoom-btn:hover{background:var(--s4);}
+.zoom-label{font-size:11px;font-weight:700;color:var(--white);min-width:36px;text-align:center;}
+input[type=range].zslider{-webkit-appearance:none;width:100px;height:3px;border-radius:2px;background:var(--s4);outline:none;cursor:pointer;}
+input[type=range].zslider::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:var(--white);}
+.bar-sep{width:1px;height:16px;background:var(--border);}
+.hint-txt{font-size:10px;color:var(--dim);}
+/* ── TABLER ICONS ── */
+i.ti{display:inline-block;vertical-align:middle;flex-shrink:0;line-height:1;font-size:15px;}
+.undo-btn i.ti,.zoom-btn i.ti{font-size:14px;}
+.drag-handle i.ti,.row-sel-btn i.ti,.del-btn i.ti,.h-del i.ti,.ev-del i.ti,.city-tab-del i.ti{font-size:13px;}
+.legend-item i.ti{font-size:12px;}
+h3 i.ti{font-size:17px;}
+@keyframes ti-spin{to{transform:rotate(360deg)}}
+.ti-spin{animation:ti-spin .9s linear infinite;display:inline-block;}
+
+/* ── MAIN TABLE ── */
+.main{flex:1;overflow:hidden;padding:12px;display:flex;flex-direction:column;min-height:0;}
+.tbl-outer{min-height:0;max-height:100%;border-radius:10px;overflow:auto;border:1px solid var(--border);align-self:flex-start;width:fit-content;max-width:100%;}
+.tbl-wrap{min-width:max-content;}
+table{border-collapse:separate;border-spacing:0;}
+th,td{border-right:1px solid var(--border2);border-bottom:1px solid var(--border2);}
+th:first-child,td:first-child{border-left:1px solid var(--border2);}
+thead th{border-top:1px solid var(--border2);}
+
+.th-name{background:var(--s2);color:var(--muted);font-size:calc(10px * var(--zoom));font-weight:600;text-align:left;padding:calc(5px * var(--zoom)) calc(10px * var(--zoom));width:var(--name-w);min-width:var(--name-w);position:sticky;left:0;top:0;z-index:12;border-right:1px solid var(--border);border-left:1px solid var(--border2);}
+.th-day{background:var(--s2);color:var(--text);font-size:calc(11px * var(--zoom));font-weight:700;text-align:center;padding:calc(4px * var(--zoom)) calc(2px * var(--zoom));min-width:var(--cell-w);width:var(--cell-w);line-height:1.25;position:sticky;top:0;z-index:7;}
+.th-day.we{background:#141414;color:var(--white);}
+.th-dn{font-size:calc(9px * var(--zoom));font-weight:400;color:var(--muted);display:block;}
+.th-day.we .th-dn{color:#e05555;}
+.th-tot{background:var(--s2);color:var(--muted);font-size:calc(10px * var(--zoom));font-weight:600;text-align:center;padding:calc(5px * var(--zoom)) calc(3px * var(--zoom));min-width:var(--tot-w);width:var(--tot-w);position:sticky;right:0;top:0;z-index:12;}
+
+/* name cell */
+/* ── name column zebra (only td-name, nothing else) ── */
+tbody tr:nth-child(4n+3) .td-name,
+tbody tr:nth-child(4n+4) .td-name { background:#1a1a1a; }
+[data-theme="light"] tbody tr:nth-child(4n+3) .td-name,
+[data-theme="light"] tbody tr:nth-child(4n+4) .td-name { background:#E8E8EF; }
+
+.td-name{background:var(--s2);color:var(--text);font-weight:600;font-size:calc(11px * var(--zoom));padding:0 calc(8px * var(--zoom));position:sticky;left:0;z-index:5;border-right:1px solid var(--border);border-left:1px solid var(--border2);min-width:var(--name-w);width:var(--name-w);cursor:grab;}
+.td-name:active{cursor:grabbing;}
+.td-name.drag-over{background:var(--s4);border-top:2px solid var(--white);}
+[data-theme="light"] .td-name.drag-over{border-top-color:#1C1C1E;}
+.td-name.dragging{opacity:.4;}
+.td-name-inner{display:flex;align-items:center;gap:5px;height:100%;}
+.drag-handle{color:var(--dim);font-size:calc(12px * var(--zoom));cursor:grab;flex-shrink:0;user-select:none;}
+.emp-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.del-btn{opacity:0;font-size:calc(10px * var(--zoom));color:var(--sick-fg);cursor:pointer;padding:2px 4px;border-radius:3px;background:transparent;border:none;flex-shrink:0;}
+.td-name:hover .del-btn{opacity:1;}
+.emp-edit-btn{opacity:0;font-size:calc(10px * var(--zoom));color:var(--dim);cursor:pointer;padding:2px 3px;border-radius:3px;background:transparent;border:none;flex-shrink:0;}
+.td-name:hover .emp-edit-btn{opacity:1;}
+.emp-edit-btn:hover{color:var(--accent);}
+.emp-name-input{flex:1;background:var(--s4);color:var(--text);border:1px solid var(--accent);border-radius:4px;padding:1px 5px;font-size:calc(11px * var(--zoom));font-weight:500;outline:none;min-width:0;}
+
+/* shift cell */
+.td-shift{width:var(--cell-w);min-width:var(--cell-w);height:calc(38px * var(--zoom));text-align:center;vertical-align:middle;cursor:pointer;font-size:calc(10px * var(--zoom));font-weight:700;position:relative;transition:filter .1s;}
+.td-shift:hover{filter:brightness(1.18);}
+.td-shift.empty{color:transparent;background:var(--s1);}
+.td-shift.we-bg{background:#131313;}
+[data-theme="light"] .td-shift.we-bg.empty{background:#EAEAF0!important;}
+.td-shift.empty:hover{background:var(--s3)!important;}
+.td-shift.empty:hover::after{content:'+';color:var(--dim);font-size:calc(16px * var(--zoom));position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);}
+[data-theme="light"] .td-shift.empty:hover::after{color:#8E8E93;}
+/* Mehrfach-mode: selected cells show − on hover (signals "click to deselect") */
+.sel-active .td-shift.sel-cell:hover .sh-wrap{opacity:.3;transition:opacity .1s;}
+.sel-active .td-shift.sel-cell:hover::after{content:'−';color:var(--dim);font-size:calc(20px * var(--zoom));font-weight:700;line-height:1;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;}
+/* override + with − for empty selected cells */
+.sel-active .td-shift.empty.sel-cell:hover::after{content:'−';color:var(--dim);}
+[data-theme="light"] .sel-active .td-shift.sel-cell:hover::after{color:var(--dim);}
+[data-theme="light"] .sel-active .td-shift.empty.sel-cell:hover{background:#FFE8E8!important;outline-color:#E05555;}
+[data-theme="light"] .sel-active .td-shift.empty.sel-cell:hover::after{color:rgba(180,0,0,.7);}
+.sh-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:calc(3px * var(--zoom));padding:calc(5px * var(--zoom)) calc(2px * var(--zoom));height:100%;}
+.sh-hotel{display:block;font-size:calc(10px * var(--zoom));font-weight:700;line-height:1.1;}
+.sh-type{display:block;font-size:calc(8px * var(--zoom));font-weight:500;opacity:.8;line-height:1.1;}
+.td-shift.s-off   {background:var(--off-bg)!important;color:var(--off-fg)!important;}
+.td-shift.s-url   {background:var(--vac-bg)!important;color:var(--vac-fg)!important;}
+.td-shift.s-krank {background:var(--sick-bg)!important;color:var(--sick-fg)!important;}
+.td-shift.s-custom{background:#1e2035;color:#a5b4fc;}  /* overridden per-cell via inline style */
+/* Span merging — hide inner right borders */
+.td-shift.span-inner{border-right:none!important;}
+.td-hours.span-inner{border-right:none!important;}
+/* Span ghost — hide content in non-middle cells (background still shows) */
+.td-shift.span-ghost .sh-wrap{visibility:hidden;}
+/* Custom status button */
+.stbtn.sel-custom{background:#1e2035;border-color:#a5b4fc;color:#a5b4fc;}
+[data-theme="light"] .stbtn.sel-custom{background:#EEF0FF;border-color:#4338CA;color:#4338CA;}
+
+/* hours cell */
+.td-hours{width:var(--cell-w);min-width:var(--cell-w);height:calc(18px * var(--zoom));text-align:center;vertical-align:middle;background:var(--bg);position:relative;}
+.td-hours.we-bg{background:#0d0d0d!important;}
+[data-theme="light"] .td-hours.we-bg{background:#E5E5EA!important;}
+.hrs-cell{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center;}
+.hrs-val{font-size:calc(9px * var(--zoom));color:var(--text);font-family:inherit;min-width:18px;text-align:center;cursor:default;user-select:none;}
+.hrs-val.empty-val{color:var(--dim);}
+.hrs-side{position:absolute;font-size:calc(8px * var(--zoom));font-weight:700;color:var(--muted);opacity:0;transition:opacity .15s;cursor:pointer;user-select:none;padding:0 3px;line-height:calc(18px * var(--zoom));}
+.hrs-dec{left:0;}
+.hrs-inc{right:0;}
+.td-hours:hover .hrs-side{opacity:.5;}
+.hrs-side:hover{opacity:1!important;color:var(--text);}
+.hrs-input-edit{width:100%;height:100%;background:transparent;border:none;outline:1px solid var(--white);outline-offset:-1px;color:var(--text);font-size:calc(9px * var(--zoom));text-align:center;font-family:inherit;}
+
+/* total cell */
+.td-tot{background:var(--s2);color:var(--white);font-weight:700;font-size:calc(11px * var(--zoom));text-align:center;position:sticky;right:0;z-index:5;min-width:var(--tot-w);width:var(--tot-w);}
+.td-tot.zero{color:var(--dim);}
+
+/* sum row */
+.tr-sum td{background:#080808;box-shadow:0 -1px 0 var(--border);color:var(--muted);font-size:calc(10px * var(--zoom));font-weight:600;text-align:center;padding:calc(3px * var(--zoom)) calc(2px * var(--zoom));}
+.tr-sum .td-name{color:var(--muted);font-size:calc(10px * var(--zoom));background:#080808;cursor:default;}
+.tr-sum .td-tot{color:var(--white);background:#080808;}
+
+/* ── MODALS ── */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:300;align-items:center;justify-content:center;padding:16px;}
+.overlay.open{display:flex;}
+.modal{background:var(--s1);border:1px solid var(--border);border-radius:13px;padding:22px;width:100%;box-shadow:0 24px 64px rgba(0,0,0,.85);}
+.modal.sm{max-width:340px;}
+.modal.md{max-width:380px;}
+.modal.lg{max-width:460px;}
+.modal h3{font-size:13px;font-weight:700;color:var(--white);margin-bottom:16px;}
+.msub{font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-top:13px;margin-bottom:5px;}
+.divider{text-align:center;color:var(--dim);font-size:10px;margin:10px 0;}
+.modal input[type=text],.modal input[type=number],.modal input[type=password]{width:100%;background:var(--s3);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:8px 11px;font-size:13px;outline:none;font-family:inherit;}
+.modal input:focus{border-color:var(--white);}
+.modal input[type=color]{width:100%;background:var(--s3);border:1px solid var(--border);border-radius:7px;padding:3px 8px;height:36px;cursor:pointer;}
+.modal-actions{display:flex;gap:6px;margin-top:16px;}
+.modal-actions .btn{flex:1;padding:9px;}
+.btn-clr{background:var(--s3);border:1px solid var(--border);color:var(--sick-fg);border-radius:7px;cursor:pointer;font-size:11px;font-weight:600;padding:9px;transition:all .15s;}
+.btn-clr:hover{background:var(--sick-bg);border-color:var(--sick-fg);}
+
+/* hotel grid */
+.h-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;}
+.hbtn{padding:7px 3px;border-radius:7px;border:2px solid transparent;font-size:10px;font-weight:700;cursor:pointer;text-align:center;transition:all .15s;}
+.hbtn.sel{border-color:#fff!important;box-shadow:0 0 0 2px rgba(255,255,255,.2);}
+.shift-row{display:flex;gap:5px;}
+.sbtn{flex:1;padding:7px;border-radius:7px;border:1px solid var(--border);background:var(--s3);color:var(--muted);cursor:pointer;font-size:11px;font-weight:600;transition:all .15s;}
+.sbtn.sel{background:#ffffff;border-color:#ffffff;color:#030303;}
+[data-theme="light"] .sbtn.sel{background:#111318;border-color:#111318;color:#ffffff;}
+.status-row{display:flex;gap:5px;}
+.stbtn{flex:1;padding:8px 5px;border-radius:7px;border:1px solid var(--border);background:var(--s3);font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;color:var(--muted);}
+.stbtn.sel-off   {background:var(--off-bg);border-color:var(--off-fg);color:var(--off-fg);}
+.stbtn.sel-url   {background:var(--vac-bg);border-color:var(--vac-fg);color:var(--vac-fg);}
+.stbtn.sel-krank {background:var(--sick-bg);border-color:var(--sick-fg);color:var(--sick-fg);}
+
+/* selected cell — box-shadow sides: 2px 0 = LEFT, -2px 0 = RIGHT, 0 2px = TOP, 0 -2px = BOTTOM */
+.td-shift.sel-cell{z-index:3;position:relative;
+  box-shadow:0 -2px 0 0 var(--white) inset,0 2px 0 0 var(--white) inset,-2px 0 0 0 var(--white) inset,2px 0 0 0 var(--white) inset;}
+/* sel-nl = left neighbour selected → keep only top/bottom/left inset */
+.td-shift.sel-cell.sel-nl{
+  box-shadow:0 -2px 0 0 var(--white) inset,0 2px 0 0 var(--white) inset,-2px 0 0 0 var(--white) inset;}
+/* sel-nr = right neighbour selected → keep only top/bottom/right, hide right border */
+.td-shift.sel-cell.sel-nr{
+  box-shadow:0 -2px 0 0 var(--white) inset,0 2px 0 0 var(--white) inset,2px 0 0 0 var(--white) inset;
+  border-right:none!important;}
+.td-shift.sel-cell.sel-nl.sel-nr{
+  box-shadow:0 -2px 0 0 var(--white) inset,0 2px 0 0 var(--white) inset;
+  border-right:none!important;}
+
+/* hotel city tabs (in shift modal) */
+.hcity-tabs{display:flex;gap:3px;margin-bottom:8px;overflow-x:auto;flex-wrap:nowrap;}
+.hcity-tab{padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--s3);color:var(--muted);cursor:pointer;font-size:10px;font-weight:600;white-space:nowrap;transition:all .15s;flex-shrink:0;}
+.hcity-tab.active{background:var(--s4);color:var(--white);border-color:var(--border);}
+
+/* selection bar */
+.sel-bar{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1c1c1c;border:1px solid #444;border-radius:12px;padding:8px 14px;display:flex;align-items:center;gap:8px;z-index:250;box-shadow:0 8px 32px rgba(0,0,0,.85);white-space:nowrap;}
+.sel-bar.hidden{display:none;}
+.sel-count{font-size:12px;font-weight:700;color:var(--white);}
+.sel-btn{padding:0 11px;height:28px;display:inline-flex;align-items:center;justify-content:center;gap:5px;border-radius:7px;border:1px solid var(--border);background:var(--s3);color:var(--text);cursor:pointer;font-size:11px;font-weight:600;transition:all .15s;}
+.sel-btn:hover{border-color:var(--white);color:var(--white);}
+.sel-btn.primary{background:var(--white);color:#030303;border-color:var(--white);}
+.sel-btn.primary:hover{background:#e0e0e0;}
+.sel-btn.danger{border-color:var(--sick-fg);color:var(--sick-fg);}
+.sel-btn.danger:hover{background:var(--sick-bg);}
+.sel-sep{width:1px;height:16px;background:var(--border);}
+/* multisel toggle in zoombar */
+.sel-mode-active{background:#ffffff!important;color:#030303!important;border-color:#ffffff!important;}
+[data-theme="light"] .sel-mode-active{background:#111318!important;color:#ffffff!important;border-color:#111318!important;}
+/* drag-select cursor */
+.drag-selecting,.drag-selecting *{cursor:crosshair!important;user-select:none!important;}
+
+/* ── ROW / COLUMN FOCUS ── */
+.th-day.col-focus{background:var(--s4)!important;color:var(--white)!important;outline:1px solid rgba(255,255,255,.25);outline-offset:-1px;}
+.td-name.row-focus{background:var(--s3)!important;border-right-color:rgba(255,255,255,.35)!important;}
+.td-name.row-focus .emp-name{color:var(--white);}
+[data-theme="light"] .th-day.col-focus{background:#8c93a8!important;color:#fff!important;outline:1px solid rgba(0,0,0,.15);outline-offset:-1px;}
+[data-theme="light"] .td-name.row-focus{background:#9099b0!important;border-right-color:rgba(0,0,0,.3)!important;}
+[data-theme="light"] .td-name.row-focus .emp-name{color:#fff;}
+/* undo/redo buttons */
+.undo-btn{background:var(--s3);border:1px solid var(--border);color:var(--text);width:24px;height:24px;border-radius:5px;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;transition:background .15s;}
+.undo-btn:hover:not(:disabled){background:var(--s4);}
+.undo-btn:disabled{opacity:.28;cursor:not-allowed;}
+/* row select button inside name cell */
+.row-sel-btn{opacity:0;font-size:calc(11px * var(--zoom));color:var(--dim);cursor:pointer;padding:1px 3px;border-radius:3px;flex-shrink:0;user-select:none;transition:opacity .1s;}
+.td-name:hover .row-sel-btn{opacity:.7;}
+.td-name:hover .row-sel-btn:hover{opacity:1;color:var(--white);}
+.sel-active .row-sel-btn{opacity:.6;}
+.sel-active .td-name:hover .row-sel-btn{opacity:1;}
+
+/* hotel manager city tabs */
+.hmgr-tabs{display:flex;gap:2px;margin-bottom:12px;background:var(--s3);border-radius:8px;padding:3px;flex-wrap:wrap;}
+.hmgr-tab{flex:1;padding:6px 10px;border-radius:6px;border:none;background:transparent;color:var(--muted);font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.hmgr-tab.active{background:var(--s4);color:var(--white);}
+/* hotel manage list */
+.h-list{display:flex;flex-direction:column;gap:4px;max-height:240px;overflow-y:auto;margin-bottom:10px;}
+.h-row{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--s3);border-radius:7px;border:1px solid var(--border2);}
+.h-clr-wrap{position:relative;width:22px;height:22px;flex-shrink:0;}
+.h-clr-swatch{width:22px;height:22px;border-radius:5px;border:2px solid rgba(255,255,255,.12);cursor:pointer;transition:border-color .15s,transform .15s;}
+.h-clr-swatch:hover{border-color:rgba(255,255,255,.5);transform:scale(1.1);}
+.h-clr-wrap input[type=color]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;border:none;padding:0;}
+.h-del{background:none;border:none;color:var(--dim);cursor:pointer;font-size:12px;padding:2px 4px;border-radius:3px;}
+.h-del:hover{color:var(--sick-fg);}
+.h-edit{background:none;border:none;color:var(--dim);cursor:pointer;font-size:12px;padding:2px 4px;border-radius:3px;flex-shrink:0;}
+.h-edit:hover{color:var(--accent);}
+.h-rname{flex:1;font-size:12px;font-weight:500;color:var(--text);cursor:text;}
+.h-rename-input{flex:1;background:var(--s4);color:var(--text);border:1px solid var(--accent);border-radius:4px;padding:2px 6px;font-size:12px;font-weight:500;outline:none;}
+/* add hotel form */
+.add-h-form{display:flex;gap:6px;align-items:stretch;}
+.add-h-form input[type=text]{flex:1;height:34px;}
+.add-h-form .btn{height:34px;padding:0 14px;white-space:nowrap;}
+/* custom color swatch picker */
+.clr-pick-wrap{position:relative;width:34px;height:34px;flex-shrink:0;}
+.clr-pick-swatch{width:34px;height:34px;border-radius:7px;border:2px solid rgba(255,255,255,.15);cursor:pointer;transition:border-color .15s,transform .15s;}
+.clr-pick-swatch:hover{border-color:rgba(255,255,255,.5);transform:scale(1.05);}
+.clr-pick-wrap input[type=color]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;border:none;padding:0;}
+[data-theme="light"] .h-clr-swatch{border-color:rgba(0,0,0,.15);}
+[data-theme="light"] .h-clr-swatch:hover{border-color:rgba(0,0,0,.4);}
+[data-theme="light"] .clr-pick-swatch{border-color:rgba(0,0,0,.15);}
+[data-theme="light"] .clr-pick-swatch:hover{border-color:rgba(0,0,0,.4);}
+
+/* settings modal tabs */
+.stab-row{display:flex;gap:2px;margin-bottom:14px;background:var(--s3);border-radius:8px;padding:3px;}
+.stab{flex:1;padding:6px;border-radius:6px;border:none;background:transparent;color:var(--muted);font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;}
+.stab.active{background:var(--s4);color:var(--white);}
+
+/* backup list */
+.bk-list{display:flex;flex-direction:column;gap:4px;max-height:160px;overflow-y:auto;}
+.bk-row{display:flex;align-items:center;gap:6px;padding:7px 10px;background:var(--s3);border-radius:7px;border:1px solid var(--border2);}
+.bk-name{flex:1;font-size:11px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.bk-date{font-size:10px;color:var(--muted);}
+
+/* ── HOLIDAY / EVENTS ── */
+/* NOTE: .th-day already has position:sticky (line 91) which provides a
+   positioned context for ::after — do NOT add position:relative here,
+   it would override sticky and break the frozen header row */
+.th-day.hday::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--hday-color,#f59e0b);z-index:2;pointer-events:none;}
+.hday-chip{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;color:#fff;white-space:nowrap;cursor:default;}
+/* Holiday manager modal */
+.hm-tabs{display:flex;gap:2px;margin-bottom:12px;background:var(--s3);border-radius:8px;padding:3px;}
+.hm-tab{flex:1;padding:6px;border-radius:6px;border:none;background:transparent;color:var(--muted);font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;}
+.hm-tab.active{background:var(--s4);color:var(--white);}
+.hm-filter-bar{display:flex;gap:3px;margin-bottom:10px;flex-wrap:wrap;}
+.hm-fbtn{padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--s3);color:var(--muted);font-size:10px;font-weight:600;cursor:pointer;transition:all .15s;}
+.hm-fbtn.active{background:var(--white);color:#030303;border-color:var(--white);}
+[data-theme="light"] .hm-fbtn.active{background:#030303;color:#fff;}
+.hm-hday-list{display:flex;flex-direction:column;gap:4px;max-height:260px;overflow-y:auto;margin-top:2px;}
+.hm-hday-row{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--s3);border-radius:7px;border:1px solid var(--border2);}
+.hm-hday-row.hday-disabled{opacity:.45;}
+.hm-hday-lhdr{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;padding:6px 4px 2px;}
+.hm-hday-name{flex:1;font-size:12px;font-weight:500;color:var(--text);}
+.hm-hday-date{font-size:12px;color:var(--muted);min-width:36px;text-align:right;flex-shrink:0;font-weight:500;}
+.hday-toggle{font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all .15s;}
+.hday-toggle.t-on{background:rgba(225,29,72,.12);color:#f43f5e;border:1px solid rgba(225,29,72,.35);}
+.hday-toggle.t-on:hover{background:rgba(225,29,72,.22);}
+.hday-toggle.t-off{background:rgba(16,185,129,.12);color:#10b981;border:1px solid rgba(16,185,129,.35);}
+.hday-toggle.t-off:hover{background:rgba(16,185,129,.22);}
+.ev-list{display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto;margin-bottom:10px;}
+.ev-row{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--s3);border-radius:7px;border:1px solid var(--border2);}
+.ev-name{flex:1;font-size:12px;font-weight:500;color:var(--text);}
+.ev-date{font-size:10px;color:var(--dim);flex-shrink:0;}
+.ev-del{background:none;border:none;color:var(--dim);cursor:pointer;font-size:12px;padding:2px 4px;border-radius:3px;flex-shrink:0;}
+.ev-del:hover{color:var(--sick-fg);}
+.add-ev-form{display:flex;flex-direction:column;gap:5px;}
+.add-ev-row{display:flex;gap:5px;align-items:center;}
+.add-ev-row input[type=text]{flex:1;}
+.add-ev-row input[type=date]{flex:1;background:var(--s3);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:7px 10px;font-size:12px;outline:none;font-family:inherit;}
+.add-ev-row input[type=date]:focus{border-color:var(--white);}
+.add-ev-row input[type=color]{width:36px;flex-shrink:0;padding:2px;border-radius:4px;}
+
+/* ── Smart Export ── */
+.ex-city-btn{padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:var(--s3);color:var(--muted);font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;}
+.ex-city-btn.active{background:var(--white);color:#030303;border-color:var(--white);}
+[data-theme="light"] .ex-city-btn.active{background:#1C1C1E;color:#fff;border-color:#1C1C1E;}
+.ex-period-bar{display:flex;gap:2px;background:var(--s3);border-radius:8px;padding:3px;}
+.ex-period-btn{flex:1;padding:7px;border-radius:6px;border:none;background:transparent;color:var(--muted);font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;}
+.ex-period-btn.active{background:var(--s4);color:var(--white);}
+.ex-range-row{display:flex;gap:8px;align-items:center;margin-top:10px;}
+.ex-range-row select{flex:1;background:var(--s3);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:8px 10px;font-size:12px;outline:none;font-family:inherit;cursor:pointer;-webkit-appearance:none;}
+.ex-range-row select:focus{border-color:var(--white);}
+.ex-preview{margin-top:14px;padding:12px 14px;background:var(--s3);border-radius:8px;border:1px solid var(--border2);min-height:64px;}
+.ex-preview-lbl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;}
+.ex-preview-row{display:flex;align-items:center;gap:8px;margin-bottom:4px;}
+.ex-preview-dot{width:8px;height:8px;border-radius:2px;background:var(--accent);flex-shrink:0;}
+
+/* ── Smart Import ── */
+.import-info-row{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--s3);border-radius:7px;border:1px solid var(--border2);margin-bottom:5px;}
+.import-mode-card{padding:12px 14px;background:var(--s3);border-radius:8px;border:1px solid var(--border2);cursor:pointer;transition:all .15s;margin-bottom:6px;}
+.import-mode-card:hover{border-color:var(--muted);}
+.import-mode-card.active{border-color:var(--accent);background:rgba(99,102,241,.07);}
+.import-mode-radio{width:14px;height:14px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;transition:all .15s;}
+.import-mode-card.active .import-mode-radio{border-color:var(--accent);background:var(--accent);}
+[data-theme="light"] .import-mode-card.active{background:rgba(99,102,241,.06);}
+
+
+/* ── v5: Region selector in new-table modal ── */
+.region-btn-row{display:flex;gap:4px;flex-wrap:wrap;margin-top:2px;}
+.region-btn{padding:5px 11px;border-radius:6px;border:1px solid var(--border);background:var(--s3);color:var(--muted);font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;}
+.region-btn:hover{border-color:var(--muted);color:var(--text);}
+.region-btn.active{background:var(--white);color:#030303;border-color:var(--white);}
+[data-theme="light"] .region-btn.active{background:#1C1C1E;color:#fff;border-color:#1C1C1E;}
+.template-sel{width:100%;background:var(--s3);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:8px 10px;font-size:12px;outline:none;font-family:inherit;cursor:pointer;-webkit-appearance:none;}
+.template-sel:focus{border-color:var(--white);}
+
+/* ── v5: Paste hint bar ── */
+.paste-hint{position:fixed;bottom:68px;left:50%;transform:translateX(-50%);background:#111;border:1px solid #333;border-radius:10px;padding:5px 10px;display:flex;align-items:center;gap:6px;z-index:260;box-shadow:0 4px 20px rgba(0,0,0,.7);white-space:nowrap;font-size:11px;color:var(--muted);}
+.paste-hint.hidden{display:none;}
+.paste-hint i.ti{font-size:13px;}
+[data-theme="light"] .paste-hint{background:#fff;border-color:#ccc;box-shadow:0 4px 16px rgba(0,0,0,.12);}
+
+/* ── v5: Table settings in Settings modal ── */
+#tableSettingsList select{color:var(--text);}
+
+@media(max-width:600px){
+  .topbar,.zoombar{padding:6px 10px;}
+  .month-label{min-width:110px;}
+}
+@media print{
+  .topbar,.city-tabs,.legend-bar,.zoombar{display:none;}
+  body{background:#fff;color:#000;overflow:visible;}
+  .main{overflow:visible;padding:0;}
+  .tbl-outer{border:none;overflow:visible;border-radius:0;}
+  :root{--zoom:1;}
+  td,th{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+}
+
+/* ── LIGHT THEME ── */
+/* ══ LIGHT THEME — Apple Calendar-inspired ══════════════════════════════ */
+[data-theme="light"]{
+  /* surfaces: systemGray6 → white → near-white → gray5 → gray4 */
+  --bg:#F2F2F7;        /* app chrome / outer background */
+  --s1:#FFFFFF;        /* topbar, modals, table bg */
+  --s2:#F9F9FB;        /* table header row */
+  --s3:#EFEFEF;        /* input fields, raised elements */
+  --s4:#E5E5EA;        /* hover, active backgrounds */
+  /* borders */
+  --border:#D1D1D6;    /* primary border (gray4) */
+  --border2:#E5E5EA;   /* subtle cell dividers (gray5) */
+  /* typography */
+  --text:#1C1C1E;      /* primary label */
+  --muted:#8E8E93;     /* secondary label */
+  --dim:#C7C7CC;       /* tertiary / placeholder */
+  --white:#1C1C1E;     /* used by btn-white logic */
+  /* status cells */
+  --off-bg:#F9F9FB;    --off-fg:#8E8E93;
+  --vac-bg:#FFF7ED;    --vac-fg:#C2410C;
+  --sick-bg:#FFF1F2;   --sick-fg:#E11D48;
+  --zoom:1;
+}
+
+/* ── Table grid ── */
+/* header cells */
+[data-theme="light"] th,
+[data-theme="light"] td{ border-right-color:#E5E5EA; border-bottom-color:#E5E5EA; }
+[data-theme="light"] th:first-child,
+[data-theme="light"] td:first-child{ border-left-color:#E5E5EA; }
+[data-theme="light"] thead th{ border-top-color:#E5E5EA; }
+
+/* day-header row */
+[data-theme="light"] .th-day{ background:#F9F9FB; color:#1C1C1E; }
+
+/* weekend: clearly darker columns to separate weeks */
+[data-theme="light"] .th-day.we{ background:#E0E0E8; }
+[data-theme="light"] .th-day.we .th-dn{ color:#FF3B30; }
+[data-theme="light"] .td-shift.we-bg{ background:#E8E8EE; }
+[data-theme="light"] .td-shift.we-bg.empty{ background:#E8E8EE; }
+[data-theme="light"] .td-hours.we-bg{ background:#E0E0E8 !important; }
+
+/* empty shift cells — pure white, hover shows intent */
+[data-theme="light"] .td-shift.empty{ background:#FFFFFF; }
+[data-theme="light"] .td-shift.empty:hover{
+  background:#EBF2FF !important;
+  outline:1px solid #0071E3;
+  outline-offset:-1px;
+}
+[data-theme="light"] .td-shift.empty:hover::after{ color:#0071E3; }
+
+/* hours row */
+[data-theme="light"] .hrs-val{ color:#1C1C1E; }
+[data-theme="light"] .hrs-input-edit{ color:#1C1C1E; }
+
+/* sticky name column — clean white with a stronger right border */
+[data-theme="light"] .th-name{ background:#F9F9FB; border-right:1px solid #C7C7CC !important; color:#8E8E93; }
+[data-theme="light"] .th-tot{ background:#F9F9FB; }
+[data-theme="light"] .td-name{ background:#F9F9FB; border-right:1px solid #C7C7CC !important; }
+[data-theme="light"] .td-name .emp-name{ color:#1C1C1E; font-weight:600; }
+[data-theme="light"] .td-name.drag-over{ background:#E5E5EA; }
+[data-theme="light"] .td-tot{ background:#F9F9FB; color:#1C1C1E; }
+
+/* drag / select icons */
+[data-theme="light"] .drag-handle{ color:#C7C7CC; }
+[data-theme="light"] .drag-handle:hover{ color:#8E8E93; }
+[data-theme="light"] .row-sel-btn{ color:#C7C7CC; }
+[data-theme="light"] .td-name:hover .row-sel-btn:hover{ color:#1C1C1E; }
+[data-theme="light"] .del-btn{ color:#C7C7CC; }
+[data-theme="light"] .del-btn:hover{ color:#E11D48; }
+
+/* Σ sum row */
+[data-theme="light"] .tr-sum td{ background:#F2F2F7; box-shadow:0 -1px 0 #D1D1D6; }
+[data-theme="light"] .tr-sum .td-name{ background:#EFEFEF; border-right:1px solid #C7C7CC !important; }
+[data-theme="light"] .tr-sum .td-tot{ background:#EFEFEF; color:#1C1C1E; }
+
+/* column / row focus */
+[data-theme="light"] .th-day.col-focus{ background:#E5F0FF !important; color:#0071E3 !important; outline:1px solid rgba(0,113,227,.25); outline-offset:-1px; }
+[data-theme="light"] .td-name.row-focus{ background:#E5F0FF !important; border-right-color:#7EB8FF !important; }
+[data-theme="light"] .td-name.row-focus .emp-name{ color:#0071E3; }
+
+/* ── Chrome elements ── */
+[data-theme="light"] .btn-white{ background:#1C1C1E; color:#FFFFFF; }
+[data-theme="light"] .btn-white:hover{ background:#3A3A3C; }
+[data-theme="light"] .city-tab.active{ color:#1C1C1E; border-bottom-color:#1C1C1E; }
+[data-theme="light"] .overlay{ background:rgba(0,0,0,.4); }
+[data-theme="light"] .modal{ background:#FFFFFF; box-shadow:0 20px 60px rgba(0,0,0,.15), 0 0 0 1px rgba(0,0,0,.06); }
+[data-theme="light"] .auth-box{ box-shadow:0 24px 64px rgba(0,0,0,.12), 0 0 0 1px rgba(0,0,0,.06); }
+[data-theme="light"] .auth-btn{ background:#1C1C1E; color:#FFFFFF; }
+[data-theme="light"] .auth-btn:hover{ background:#3A3A3C; }
+[data-theme="light"] .sel-bar{ background:#FFFFFF; border:1px solid #D1D1D6; box-shadow:0 4px 24px rgba(0,0,0,.10); }
+[data-theme="light"] .sel-btn.primary{ color:#ffffff; }
+[data-theme="light"] .sel-btn.primary:hover{ background:#2c2c2e; color:#ffffff; }
+[data-theme="light"] .shift-opt:hover{ background:var(--s3); }
+[data-theme="light"] .h-row{ background:#F9F9FB; border-color:#E5E5EA; }
+[data-theme="light"] #themeBtn{ font-size:15px; padding:4px 9px; line-height:1; }
+[data-theme="light"] .hmgr-tab.active{ background:#E5E5EA; color:#1C1C1E; }
+[data-theme="light"] .stab.active{ background:#E5E5EA; color:#1C1C1E; }
+
+/* ── OFFLINE BANNER ── */
+#offlineBanner{display:none;position:fixed;top:0;left:0;right:0;z-index:9999;
+  background:#7c2d12;color:#fff;font-size:12px;font-weight:600;
+  text-align:center;padding:5px 16px;letter-spacing:.3px;pointer-events:none;}
+body.is-offline #offlineBanner{display:block;}
+/* ── CROSSHAIR HOVER (Excel-style) ─────────────────────────────────────── */
+tr.x-row td, tr.x-row th {
+  box-shadow: inset 0 0 0 9999px rgba(255,255,255,0.035);
+}
+tr.x-row .td-name {
+  box-shadow: inset 0 0 0 9999px rgba(255,255,255,0.07);
+  color: var(--white);
+}
+th.x-col {
+  box-shadow: inset 0 0 0 9999px rgba(255,255,255,0.14);
+  color: var(--white);
+}
+td.x-cell {
+  outline: 1px solid rgba(255,255,255,0.32);
+  outline-offset: -1px;
+  position: relative;
+  z-index: 1;
+}
+/* ── CROSSHAIR — light theme overrides ─────────────────────────────────── */
+[data-theme="light"] tr.x-row td,
+[data-theme="light"] tr.x-row th {
+  box-shadow: inset 0 0 0 9999px rgba(0,0,0,0.045);
+}
+[data-theme="light"] tr.x-row .td-name {
+  box-shadow: inset 0 0 0 9999px rgba(0,0,0,0.08);
+  color: var(--text);
+}
+[data-theme="light"] th.x-col {
+  box-shadow: inset 0 0 0 9999px rgba(0,0,0,0.13);
+  color: #1C1C1E;
+}
+[data-theme="light"] td.x-cell {
+  outline: 1px solid rgba(0,0,0,0.30);
+  outline-offset: -1px;
+}
+</style>
+</head>
+<body>
+<div id="offlineBanner">⚡ Offline — Änderungen werden lokal gespeichert</div>
+
+<!-- ══ AUTH SCREEN ══ -->
+<div id="authScreen">
+  <div class="auth-box">
+    <div class="auth-logo">L&amp;K <span>Dienstplanung</span></div>
+    <div class="auth-sub" id="authSub">E-Mail eingeben um fortzufahren.</div>
+
+    <!-- Step 1: email input -->
+    <div id="otpRequestForm">
+      <span class="auth-label">E-Mail</span>
+      <input class="auth-input" type="email" id="authEmail" placeholder="name@example.com"
+        onkeydown="if(event.key==='Enter')doRequestOTP()">
+      <button class="auth-btn" id="otpRequestBtn" onclick="doRequestOTP()">Code senden</button>
+    </div>
+
+    <!-- Step 2: OTP code -->
+    <div id="otpVerifyForm" style="display:none">
+      <span class="auth-label">8-stelliger Code</span>
+      <input class="auth-input" type="text" id="authOTP" placeholder="12345678"
+        maxlength="8" inputmode="numeric" autocomplete="one-time-code"
+        onkeydown="if(event.key==='Enter')doVerifyOTP()">
+      <button class="auth-btn" id="otpVerifyBtn" onclick="doVerifyOTP()">Bestätigen</button>
+      <div style="font-size:11px;color:var(--muted);margin-top:12px;cursor:pointer;"
+        onclick="showOTPRequest()">← Andere E-Mail verwenden</div>
+    </div>
+
+    <!-- Step 3 (one-time): migrate old encrypted data -->
+    <div id="migrationForm" style="display:none">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.6;">
+        Alte verschlüsselte Daten gefunden.<br>
+        Einmal das alte Passwort eingeben um zu migrieren.
+      </div>
+      <span class="auth-label">Altes Passwort</span>
+      <input class="auth-input" type="password" id="migPw" placeholder="Altes Passwort"
+        onkeydown="if(event.key==='Enter')doMigrate()">
+      <button class="auth-btn" onclick="doMigrate()">Daten migrieren</button>
+      <div style="font-size:11px;color:var(--muted);margin-top:12px;cursor:pointer;"
+        onclick="skipMigration()">Überspringen (Daten gehen verloren)</div>
+    </div>
+
+    <div class="auth-err" id="authErr"></div>
+  </div>
+</div>
+
+<!-- ══ MAIN APP ══ -->
+<div id="app" style="display:none;flex:1;flex-direction:column;overflow:hidden;" class="flex-col">
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+      <div class="logo">L&amp;K <span>Dienstplanung</span></div>
+      <div class="month-nav">
+        <button class="nav-btn" onclick="changeMonth(-1)"><i class="ti ti-chevron-left"></i></button>
+        <div class="month-label" id="monthLabel"></div>
+        <button class="nav-btn" onclick="changeMonth(1)"><i class="ti ti-chevron-right"></i></button>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <button class="btn btn-ghost" onclick="openAddEmp()"><i class="ti ti-user-plus"></i> Mitarbeiter</button>
+      <button class="btn btn-ghost" onclick="openHotelMgr()"><i class="ti ti-building"></i> Hotels</button>
+      <button class="btn btn-ghost" onclick="openHolidayMgr()"><i class="ti ti-calendar"></i> Feiertage</button>
+      <button class="btn btn-ghost" onclick="openSettings()"><i class="ti ti-settings"></i> Einstellungen</button>
+      <button class="btn btn-ghost" id="themeBtn" onclick="toggleTheme()" title="Theme wechseln"><i class="ti ti-sun" id="themeIcon"></i></button>
+      <button class="btn btn-white" onclick="takeScreenshot()" id="ssBtn"><i class="ti ti-camera"></i> Screenshot</button>
+    </div>
+  </div>
+
+  <!-- CITY TABS -->
+  <div class="city-tabs" id="cityTabs"></div>
+
+  <!-- LEGEND -->
+  <div class="legend-bar" id="legendBar"></div>
+
+  <!-- ZOOM BAR -->
+  <div class="zoombar">
+    <button class="zoom-btn" onclick="zoomOut()">−</button>
+    <input type="range" class="zslider" id="zSlider" min="30" max="130" value="100" oninput="setZoom(+this.value)">
+    <button class="zoom-btn" onclick="zoomIn()">+</button>
+    <span class="zoom-label" id="zLabel">100%</span>
+    <div class="bar-sep"></div>
+    <button class="btn btn-ghost" onclick="fitScreen()" style="font-size:10px;padding:4px 9px;"><i class="ti ti-maximize"></i> Anpassen</button>
+    <button class="btn btn-ghost" onclick="setZoom(100)" style="font-size:10px;padding:4px 9px;"><i class="ti ti-refresh"></i> Reset</button>
+    <div class="bar-sep"></div>
+    <button class="btn btn-ghost" id="selModeBtn" onclick="toggleSelMode()" style="font-size:10px;padding:4px 9px;" title="Ctrl+Klick für Mehrfachauswahl"><i class="ti ti-checkbox"></i> Mehrfach</button>
+    <div class="bar-sep"></div>
+    <button class="undo-btn" id="undoBtn" onclick="undo()" disabled title="Rückgängig (Ctrl+Z)"><i class="ti ti-arrow-back-up"></i></button>
+    <button class="undo-btn" id="redoBtn" onclick="redo()" disabled title="Wiederholen (Ctrl+Y)"><i class="ti ti-arrow-forward-up"></i></button>
+    <div class="bar-sep"></div>
+    <span class="hint-txt" id="ssHint"></span>
+  </div>
+
+  <!-- TABLE -->
+  <div class="main"><div class="tbl-outer"><div class="tbl-wrap"><table id="tbl"></table></div></div></div>
+
+  <!-- SELECTION BAR -->
+  <div class="sel-bar hidden" id="selBar">
+    <span class="sel-count" id="selCount">0 Zellen</span>
+    <div class="sel-sep"></div>
+    <button class="sel-btn primary" onclick="applyToSelection()">Anwenden</button>
+    <button class="sel-btn danger" onclick="clearSelCells()">Löschen</button>
+    <div class="sel-sep"></div>
+    <button class="sel-btn" id="copyBtn" onclick="copySelection()" title="Ctrl+C"><i class="ti ti-copy"></i> Kopieren</button>
+    <button class="sel-btn" id="swapBtn" onclick="swapSelection()" title="Tage tauschen (2 Personen wählen)" style="display:none;"><i class="ti ti-transfer"></i> Tauschen</button>
+    <div class="sel-sep"></div>
+    <button class="sel-btn" onclick="selectAllCells()">Alle wählen</button>
+    <button class="sel-btn" onclick="deselectAll()"><i class="ti ti-x"></i> Aufheben</button>
+  </div>
+  <!-- Paste button: shown when clipboard has data, floats near selBar -->
+  <div class="paste-hint hidden" id="pasteHint">
+    <i class="ti ti-clipboard"></i> <span id="pasteHintTxt">Kopiert</span>
+    <button class="sel-btn primary" onclick="pasteSelection()" title="Ctrl+V"><i class="ti ti-clipboard-check"></i> Einfügen</button>
+    <button class="sel-btn" onclick="clearClipboard()"><i class="ti ti-x"></i></button>
+  </div>
+
+</div>
+
+<!-- ══ SHIFT MODAL ══ -->
+<div class="overlay" id="shiftOv">
+  <div class="modal md">
+    <h3 id="shiftTitle">Schicht</h3>
+    <div class="msub">Status</div>
+    <div class="status-row">
+      <button class="stbtn" id="stOff"    onclick="pickSt('Off')">Off</button>
+      <button class="stbtn" id="stUrl"    onclick="pickSt('Urlaub')"><i class="ti ti-sun"></i> Urlaub</button>
+      <button class="stbtn" id="stKrank"  onclick="pickSt('Krank')"><i class="ti ti-circle-x"></i> Krank</button>
+      <button class="stbtn" id="stCustom" onclick="pickSt('Custom')"><i class="ti ti-tag"></i> Custom</button>
+    </div>
+    <div id="customLabelRow" style="display:none;margin-top:8px;">
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input type="text" id="customLabelInput" placeholder="Label eingeben…" maxlength="30"
+          style="flex:1;background:var(--s3);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:8px 10px;font-size:13px;outline:none;font-family:inherit;"
+          oninput="onCustomLabelInput(this.value)">
+        <div class="clr-pick-wrap" title="Zellenfarbe wählen">
+          <div class="clr-pick-swatch" id="customColSwatch" style="background:#6366f1"></div>
+          <input type="color" id="customColorInput" value="#6366f1"
+            oninput="ms.customColor=this.value;document.getElementById('customColSwatch').style.background=this.value">
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:7px;">
+        <span style="font-size:10px;color:var(--muted);white-space:nowrap;min-width:54px;">Intensität</span>
+        <input type="range" id="customOpacityInput" min="10" max="100" value="100" step="5"
+          style="flex:1;-webkit-appearance:none;height:3px;border-radius:2px;background:var(--s4);outline:none;cursor:pointer;"
+          oninput="ms.customOpacity=this.value/100;document.getElementById('customOpacityVal').textContent=this.value+'%'">
+        <span id="customOpacityVal" style="font-size:10px;font-weight:700;color:var(--white);min-width:30px;text-align:right;">100%</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:7px;">
+        <span style="font-size:10px;color:var(--muted);white-space:nowrap;min-width:54px;">Zeit</span>
+        <input type="text" id="customTimeInput" placeholder="14:00–22:30" maxlength="15"
+          style="flex:1;background:var(--s3);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit;"
+          oninput="ms.customTime=this.value">
+        <input type="number" id="customHrsInput" step="0.5" min="0" max="24" placeholder="Std."
+          style="width:58px;background:var(--s3);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit;text-align:center;"
+          oninput="ms.customHours=parseFloat(this.value)||0">
+      </div>
+    </div>
+    <div id="statusHrsRow" style="display:none;margin-top:8px;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:10px;color:var(--muted);white-space:nowrap;min-width:54px;">Stunden</span>
+        <input type="number" id="statusHrsInput" step="0.5" min="0" max="24" placeholder="Std. (optional)"
+          style="flex:1;background:var(--s3);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:6px 8px;font-size:12px;outline:none;font-family:inherit;text-align:center;">
+      </div>
+    </div>
+    <div class="divider">— oder Hotel —</div>
+    <div id="hotelSec">
+      <div class="hcity-tabs" id="hotelCityTabs" style="display:none;"></div>
+      <div class="h-grid" id="hGrid"></div>
+      <div class="msub">Schicht</div>
+      <div class="shift-row">
+        <button class="sbtn" id="sNight" onclick="pickSh('Night')"><i class="ti ti-moon"></i> Night</button>
+        <button class="sbtn" id="sLate"  onclick="pickSh('Late')"><i class="ti ti-sunset-2"></i> Late</button>
+      </div>
+      <div class="msub">Stunden</div>
+      <input type="number" id="mHrs" step="0.5" min="0" max="24" placeholder="z. B. 8.5">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-clr" onclick="clearCell()">Löschen</button>
+      <button class="btn btn-ghost" onclick="closeModal('shiftOv')">Abbrechen</button>
+      <button class="btn btn-white" onclick="saveShift()">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CONFIRM DIALOG ══ -->
+<div class="overlay" id="confirmOv" onclick="if(event.target===this)_confirmCancel()" style="z-index:600;">
+  <div class="modal sm" style="max-width:360px;text-align:center;padding:28px 28px 22px;">
+    <div id="confirmIcon" style="font-size:32px;margin-bottom:10px;">🗑</div>
+    <div id="confirmMsg" style="font-size:14px;font-weight:500;color:var(--text);line-height:1.5;margin-bottom:20px;"></div>
+    <div style="display:flex;gap:10px;justify-content:center;">
+      <button class="btn btn-ghost" onclick="_confirmCancel()" id="confirmCancelBtn">Abbrechen</button>
+      <button class="btn" id="confirmOkBtn" onclick="_confirmOk()" style="background:#E11D48;border-color:#E11D48;">Löschen</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SMART EXPORT MODAL ══ -->
+<div class="overlay" id="exportOv" onclick="if(event.target===this)closeModal('exportOv')" style="z-index:600;">
+  <div class="modal md" style="max-width:460px;">
+    <h3><i class="ti ti-upload"></i> Daten exportieren</h3>
+    <div class="msub" style="margin-top:0;">Städte</div>
+    <div style="display:flex;gap:4px;flex-wrap:wrap;" id="exCityBar"></div>
+    <div class="msub">Zeitraum</div>
+    <div class="ex-period-bar">
+      <button class="ex-period-btn active" data-p="current" onclick="setExPeriod('current')">Aktueller Monat</button>
+      <button class="ex-period-btn" data-p="range" onclick="setExPeriod('range')">Zeitraum</button>
+      <button class="ex-period-btn" data-p="all" onclick="setExPeriod('all')">Alles</button>
+    </div>
+    <div class="ex-range-row" id="exRangeRow" style="display:none;">
+      <select id="exFrom" onchange="renderExPreview()"></select>
+      <span style="font-size:11px;color:var(--muted);flex-shrink:0;">bis</span>
+      <select id="exTo" onchange="renderExPreview()"></select>
+    </div>
+    <div class="ex-preview" id="exPreview"></div>
+    <div class="modal-actions" style="margin-top:14px;">
+      <button class="btn btn-ghost" onclick="closeModal('exportOv')">Abbrechen</button>
+      <button class="btn btn-white" onclick="doSmartExport()"><i class="ti ti-download"></i> Exportieren</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ IMPORT PREVIEW MODAL ══ -->
+<div class="overlay" id="importPreviewOv" onclick="if(event.target===this)closeModal('importPreviewOv')" style="z-index:600;">
+  <div class="modal md" style="max-width:460px;">
+    <h3><i class="ti ti-download"></i> Daten importieren</h3>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;gap:6px;">
+      <i class="ti ti-file-type-json" style="font-size:14px;"></i>
+      <span id="importFileName"></span>
+    </div>
+    <div class="msub" style="margin-top:0;">Datei-Inhalt</div>
+    <div id="importFileInfo"></div>
+    <div class="msub">Import-Modus</div>
+    <div class="import-mode-card active" id="modeCardMerge" onclick="setImportMode('merge')">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div class="import-mode-radio" id="modeRadioMerge"></div>
+        <div>
+          <div style="font-size:12px;font-weight:700;color:var(--text);">Zusammenführen <span style="font-size:10px;font-weight:500;color:var(--accent);">· Empfohlen</span></div>
+          <div style="font-size:11px;color:var(--muted);margin-top:3px;line-height:1.5;">Importierte Monate werden übernommen, alle anderen Daten bleiben unverändert.</div>
+        </div>
+      </div>
+    </div>
+    <div class="import-mode-card" id="modeCardReplace" onclick="setImportMode('replace')">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div class="import-mode-radio" id="modeRadioReplace"></div>
+        <div>
+          <div style="font-size:12px;font-weight:700;color:var(--text);">Alles ersetzen</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:3px;line-height:1.5;">Aktuelle Daten werden vollständig überschrieben. Nicht rückgängig zu machen!</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-actions" style="margin-top:14px;">
+      <button class="btn btn-ghost" onclick="closeModal('importPreviewOv')">Abbrechen</button>
+      <button class="btn btn-white" onclick="doImport()"><i class="ti ti-download"></i> Importieren</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ ADD EMP MODAL ══ -->
+<div class="overlay" id="empOv">
+  <div class="modal sm">
+    <h3>Mitarbeiter hinzufügen</h3>
+    <div class="msub">Name</div>
+    <input type="text" id="newEmpNm" placeholder="Nachname, Vorname" onkeydown="if(event.key==='Enter')saveEmp()">
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('empOv')">Abbrechen</button>
+      <button class="btn btn-white" onclick="saveEmp()">Hinzufügen</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ ADD TABLE MODAL (v5) ══ -->
+<div class="overlay" id="cityOv">
+  <div class="modal sm" style="max-width:400px;">
+    <h3><i class="ti ti-table"></i> Neue Tabelle erstellen</h3>
+    <div class="msub">Name</div>
+    <input type="text" id="newCityNm" placeholder="z. B. Team Nacht, Hotel Roomers, Hamburg…" onkeydown="if(event.key==='Enter')saveCity()">
+    <div class="msub">Feiertagsregion <span style="font-size:10px;color:var(--muted);font-weight:400;">(optional — kann später geändert werden)</span></div>
+    <div class="region-btn-row" id="newCityRegionRow">
+      <button class="region-btn active" data-key="null"      onclick="setNewCityRegion(null)">Keine</button>
+      <button class="region-btn" data-key="münchen"          onclick="setNewCityRegion('münchen')">München</button>
+      <button class="region-btn" data-key="hamburg"          onclick="setNewCityRegion('hamburg')">Hamburg</button>
+      <button class="region-btn" data-key="berlin"           onclick="setNewCityRegion('berlin')">Berlin</button>
+    </div>
+    <div class="msub" style="margin-top:12px;">Von Vorlage kopieren <span style="font-size:10px;color:var(--muted);font-weight:400;">(Mitarbeiter + Hotels, kein Plan)</span></div>
+    <select id="newCityTemplSel" class="template-sel" onchange="_newCityTemplate=this.value||null">
+      <option value="">— Leer starten —</option>
+    </select>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('cityOv')">Abbrechen</button>
+      <button class="btn btn-white" onclick="saveCity()"><i class="ti ti-plus"></i> Erstellen</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ HOTEL MANAGER ══ -->
+<div class="overlay" id="hotelOv">
+  <div class="modal lg">
+    <h3><i class="ti ti-building"></i> Hotels verwalten</h3>
+    <div class="hmgr-tabs" id="hmgrTabs"></div>
+    <div class="h-list" id="hList"></div>
+    <div class="msub">Neues Hotel</div>
+    <div class="add-h-form">
+      <input type="text" id="newHNm" placeholder="Hotel Name">
+      <div class="clr-pick-wrap" title="Farbe wählen">
+        <div class="clr-pick-swatch" id="newHColSwatch" style="background:#5B9BD5"></div>
+        <input type="color" id="newHCol" value="#5B9BD5" oninput="document.getElementById('newHColSwatch').style.background=this.value">
+      </div>
+      <button class="btn btn-white" onclick="addHotel()"><i class="ti ti-plus"></i> Add</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-white" onclick="closeModal('hotelOv');render()">Fertig</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SETTINGS MODAL ══ -->
+<div class="overlay" id="settingsOv">
+  <div class="modal lg">
+    <h3>Einstellungen</h3>
+    <div class="stab-row">
+      <button class="stab active" onclick="switchStab(0)">Konto</button>
+      <button class="stab" onclick="switchStab(1)">Tabellen</button>
+      <button class="stab" onclick="switchStab(2)">Backup</button>
+      <button class="stab" onclick="switchStab(3)">Export / Import</button>
+    </div>
+
+    <!-- Tab 0: Konto -->
+    <div id="stab0">
+      <div class="msub" style="margin-top:0;">Konto</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:4px;">Angemeldet als:</div>
+      <div style="font-size:13px;font-weight:600;color:var(--white);margin-bottom:16px;" id="settingsUserEmail">—</div>
+      <div class="msub" style="margin-top:8px;">Sitzung beenden</div>
+      <button class="btn btn-danger" style="width:100%;padding:10px;" onclick="signOut()">
+        <i class="ti ti-logout"></i> Abmelden
+      </button>
+    </div>
+
+    <!-- Tab 1: Tabellen -->
+    <div id="stab1" style="display:none">
+      <div class="msub" style="margin-top:0;">Feiertagsregion pro Tabelle</div>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:10px;">Weise jeder Tabelle eine Feiertagsregion zu. Die Zuordnung kann jederzeit geändert werden.</p>
+      <div id="tableSettingsList" style="display:flex;flex-direction:column;gap:6px;"></div>
+    </div>
+
+    <!-- Tab 2: Backup -->
+    <div id="stab2" style="display:none">
+      <div class="msub">Manuelles Backup erstellen</div>
+      <button class="btn btn-white" style="width:100%;padding:10px;" onclick="createBackup()"><i class="ti ti-device-floppy"></i> Backup jetzt erstellen</button>
+      <div class="msub" style="margin-top:14px;">Gespeicherte Backups</div>
+      <div class="bk-list" id="bkList"></div>
+      <div style="font-size:10px;color:var(--dim);margin-top:8px;">Backups werden lokal im Browser gespeichert (max. 5 Backups). Für langfristige Sicherung → Export als JSON.</div>
+    </div>
+
+    <!-- Tab 3: Export/Import -->
+    <div id="stab3" style="display:none">
+      <div class="msub" style="margin-top:0;">Daten exportieren</div>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:10px;">Wähle Städte und Zeitraum — exportiere gezielt nur das, was benötigt wird.</p>
+      <button class="btn btn-white" style="width:100%;padding:11px;" onclick="openExportModal()">
+        <i class="ti ti-upload"></i> Exportieren…
+      </button>
+      <div class="msub" style="margin-top:16px;">Daten importieren</div>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:10px;">Importierte Daten können zusammengeführt oder vollständig übernommen werden.</p>
+      <input type="file" id="importFile" accept=".json" style="display:none" onchange="handleImportFile(this)">
+      <button class="btn btn-ghost" style="width:100%;padding:11px;" onclick="document.getElementById('importFile').click()">
+        <i class="ti ti-download"></i> JSON-Datei importieren…
+      </button>
+      <div style="font-size:11px;color:var(--vac-fg);margin-top:6px;" id="importMsg"></div>
+    </div>
+
+    <div class="modal-actions" style="margin-top:16px;">
+      <button class="btn btn-ghost" onclick="closeModal('settingsOv')">Schließen</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ HOLIDAY MANAGER ══ -->
+<div class="overlay" id="holidayOv">
+  <div class="modal lg" style="max-width:520px;">
+    <h3><i class="ti ti-calendar"></i> Feiertage &amp; Events</h3>
+    <div class="hm-tabs">
+      <button class="hm-tab active" onclick="switchHMTab(0)">Feiertage</button>
+      <button class="hm-tab" onclick="switchHMTab(1)">Eigene Events</button>
+    </div>
+
+    <!-- Tab 0: Built-in holidays -->
+    <div id="hmTab0">
+      <div class="msub" style="margin-top:0;">Ebenen anzeigen</div>
+      <div class="hm-filter-bar" id="hmFilterBar"></div>
+      <div class="msub">Feiertage dieser Ebenen</div>
+      <div class="hm-hday-list" id="hmHdayList"></div>
+    </div>
+
+    <!-- Tab 1: Custom events -->
+    <div id="hmTab1" style="display:none;">
+      <div class="msub" style="margin-top:0;">Eigene Events</div>
+      <div class="ev-list" id="evList"></div>
+      <div class="msub">Event hinzufügen</div>
+      <div class="add-ev-form">
+        <input type="text" id="newEvName" placeholder="Name des Events">
+        <div class="add-ev-row">
+          <input type="date" id="newEvDate" title="Datum (von)">
+          <span style="font-size:11px;color:var(--muted);flex-shrink:0;">bis</span>
+          <input type="date" id="newEvDateTo" title="Enddatum (optional)">
+          <div class="h-clr-wrap" title="Farbe wählen" style="width:26px;height:26px;flex-shrink:0;">
+            <div class="h-clr-swatch" id="newEvColorSwatch" style="background:#10b981;width:26px;height:26px;border-radius:6px;"></div>
+            <input type="color" id="newEvColor" value="#10b981" oninput="document.getElementById('newEvColorSwatch').style.background=this.value">
+          </div>
+        </div>
+        <div style="font-size:10px;color:var(--dim);">Enddatum optional — für mehrtägige Events</div>
+        <button class="btn btn-white" style="margin-top:4px;padding:9px;" onclick="addEvent()">+ Event hinzufügen</button>
+      </div>
+    </div>
+
+    <div class="modal-actions" style="margin-top:14px;">
+      <button class="btn btn-ghost" onclick="closeModal('holidayOv')">Schließen</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══ CONSTANTS ══════════════════════════════════════════════════════════════
+const APP_VERSION = 13;
+
+// ── Supabase config ──────────────────────────────────────────────────────────
+// Replace the two placeholders with your project values from supabase.com → Project Settings → API
+const SUPABASE_URL      = 'https://pzutzvclegbzwveunzmy.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_MDR16HAmgFwOeJxhHTs6Tw_KJpHtz7t';
+let _supa = null;          // Supabase client — initialised in INIT
+let currentUser = null;    // { id, email } — set after successful auth
+
+// ══ STORAGE & SYNC ARCHITECTURE ════════════════════════════════════════════
+// ── Crypto: isolated encryption boundary ─────────────────────────────────────
+// All crypto operations go through this module.
+// Separating it from persist() lets us swap key derivation or add per-entry
+// encryption in v9+ without touching the rest of the codebase.
+const Crypto = {
+  ALGORITHM: 'AES-GCM',
+  KEY_VERSION: 1,              // bump when key derivation params change
+  async wrap(data, key)   { return encrypt(data, key); },   // full-blob encrypt
+  async unwrap(blob, key) { return decrypt(blob, key); },   // full-blob decrypt
+  // Future: wrapEntry(entry, key) / unwrapEntry(blob, key) for per-entry mode
+};
+
+// ── Storage: unified persistence interface ────────────────────────────────────
+// Callers use Storage.save(); the real work is in persist() via IndexedDB.
+// Swapping the storage backend (Electron, server-side) only requires changing this object.
+const Storage = {
+  async save(data) {
+    // Primary path: IndexedDB encrypted blob — handled by persist() below.
+    // Future: Electron fs.writeFile / server-side blob backup.
+    return; // persist() is the canonical implementation; this stub is for layered callers.
+  }
+};
+
+// ── SyncQueue: granular operation log ────────────────────────────────────────
+// Records every mutation as a structured op. Used by the Supabase sync layer (v9).
+// Replaces the old no-op stub with a real in-memory queue + drain/flush interface.
+const SyncQueue = (() => {
+  const _ops = [];   // pending ops accumulated since last flush
+
+  function push(op) {
+    // Stamp and enqueue: {city, emp, year, month, day, val, queuedAt}
+    _ops.push({ ...op, queuedAt: Date.now() });
+    // v9: auto-flush on online event (see window 'online' listener below)
+  }
+
+  function drain() {
+    // Return all pending ops and clear the queue. Called by flush().
+    return _ops.splice(0, _ops.length);
+  }
+
+  function flush() {
+    // v12: real flush — drain queue and send to Supabase
+    if (_ops.length > 0 && navigator.onLine) Supabase.upsertBatch(drain());
+  }
+
+  function size()  { return _ops.length; }       // diagnostic / badge counter
+  function peek()  { return [..._ops]; }          // read-only snapshot
+
+  return { push, drain, flush, size, peek };
+})();
+
+// ── Supabase: clean integration boundary ─────────────────────────────────────
+// ALL remote sync goes through this object. Nothing else touches the network.
+// Currently a no-op stub; wire up in v9 by replacing the method bodies.
+const Supabase = {
+  _client: null,          // supabase-js client instance (set in v9 init)
+  _realtimeSub: null,     // active realtime subscription handle
+
+  // v9: init('https://xxx.supabase.co', 'anon-key')
+  init(url, anonKey) { /* no-op until v9 */ },
+
+  // v12: upsert a single entry row via Supabase RPC (last-write-wins)
+  async upsertEntry(op) {
+    if (!_supa || !currentUser) return;
+    const ts = new Date(op.val?.updatedAt || op.deletedAt || Date.now()).toISOString();
+    const { error } = await _supa.rpc('upsert_entry', {
+      p_city_id:    op.city,
+      p_emp_id:     op.emp,
+      p_year:       op.year,
+      p_month:      op.month,
+      p_day:        op.day,
+      p_payload:    op.val ?? null,
+      p_updated_at: ts
+    });
+    if (error) console.warn('[Supabase] upsertEntry error:', error.message);
+  },
+
+  // v12: upsert a batch of entries — called on reconnect or debounced flush
+  async upsertBatch(ops) {
+    if (!_supa || !currentUser || !ops.length) return;
+    await Promise.allSettled(ops.map(op => this.upsertEntry(op)));
+  },
+
+  // v9: subscribe to realtime broadcasts from other logged-in users
+  subscribeRealtime(onEntry) { /* no-op until v9 */ },
+
+  // Apply a remote entry received via realtime — last-write-wins merge into appData.
+  // Does NOT call SyncQueue.push() (no echo-loop) and does NOT call persist()
+  // (the next local mutation will persist the merged state automatically).
+  applyRemoteEntry(op) {
+    if (!appData) return;
+
+    // Fix 4: defer if user is actively editing — retry after 500ms.
+    // Remote events are idempotent and LWW-safe, so the delay is harmless.
+    if (isInteracting()) {
+      setTimeout(() => Supabase.applyRemoteEntry(op), 500);
+      return;
+    }
+
+    const c = appData.cities[op.city];
+    if (!c) return;
+    const s = c.schedule;
+    if (!s[op.year])               s[op.year] = {};
+    if (!s[op.year][op.month])     s[op.year][op.month] = {};
+    if (!s[op.year][op.month][op.emp]) s[op.year][op.month][op.emp] = {};
+    const existing = s[op.year][op.month][op.emp][op.day];
+
+    // Fix 5: proper LWW comparison — deletions carry deletedAt (set by setEntry),
+    // upserts carry updatedAt. Both are compared against the local entry's updatedAt.
+    // Old code had `!op.val` which unconditionally applied all remote deletions,
+    // potentially overwriting newer local data.
+    const remoteTs = op.val?.updatedAt || op.deletedAt || 0;
+    const localTs  = existing?.updatedAt || 0;
+    if (remoteTs >= localTs) {
+      if (op.val === null) { delete s[op.year][op.month][op.emp][op.day]; }
+      else                 { s[op.year][op.month][op.emp][op.day] = op.val; }
+
+      // Refresh visible cell while preserving selection state (Fix 6)
+      if (op.city === activeCityId && op.year === curYear && op.month === curMonth) {
+        const cellKey   = op.emp + '|||' + op.day;
+        const wasSel    = selectedCells.has(cellKey);
+        refreshHoursCell(op.emp, op.day);
+        updateTotals();
+        // Restore sel-cell class that DOM rebuild may have removed
+        if (wasSel) {
+          const el = document.querySelector(`[data-selkey="${CSS.escape(cellKey)}"]`);
+          if (el) el.classList.add('sel-cell');
+        }
+      }
+    }
+  },
+};
+// ── schedulePersist: microtask-debounced persist coalescer (Fix 1) ───────────
+// Coalesces rapid synchronous calls (bulk paste, swap, multi-select, clear-sel)
+// into a single IndexedDB write on the next microtask checkpoint.
+// ONLY setEntry() uses this. All other callers that need immediate persistence
+// (undo/redo, structural ops) call persist() directly.
+let _persistScheduled = false;
+function schedulePersist() {
+  if (_persistScheduled) return;
+  _persistScheduled = true;
+  // Promise.resolve() fires at end of current synchronous execution block,
+  // before the next browser paint — perfect for coalescing N setEntry() calls.
+  Promise.resolve().then(() => {
+    _persistScheduled = false;
+    persist();
+  });
+}
+
+// ── scheduleFlush: debounced Supabase sync (v12) ─────────────────────────────
+// Waits 1500ms after last setEntry() call, then flushes queued ops to Supabase.
+// Prevents hammering the API during rapid bulk edits (paste, multi-select, etc.)
+let _flushTimer = null;
+function scheduleFlush() {
+  clearTimeout(_flushTimer);
+  _flushTimer = setTimeout(() => SyncQueue.flush(), 1500);
+}
+
+const MONTHS = ["Januar","Februar","März","April","Mai","Juni",
+                "Juli","August","September","Oktober","November","Dezember"];
+const DAYS   = ["So","Mo","Di","Mi","Do","Fr","Sa"];
+const STATUS_META = {
+  Off:    {cls:'s-off',   lbl:'Off',    icon:'—'},
+  Urlaub: {cls:'s-url',   lbl:'Urlaub', icon:'☀'},
+  Krank:  {cls:'s-krank', lbl:'Krank',  icon:'✕'},
+  Custom: {cls:'s-custom', lbl:'',      icon:''},
+};
+// ══ HOLIDAY CONSTANTS ══════════════════════════════════════════════════════
+const BUILT_IN_HOLIDAYS = [
+  // 🌍 Global
+  {id:'g-neujahr',    name:'Neujahr',                 layer:'global', month:1,  day:1,  defaultColor:'#f59e0b'},
+  {id:'g-xmaseve',    name:'Heiligabend',              layer:'global', month:12, day:24, defaultColor:'#f59e0b'},
+  {id:'g-xmas1',      name:'1. Weihnachtstag',         layer:'global', month:12, day:25, defaultColor:'#f59e0b'},
+  {id:'g-xmas2',      name:'2. Weihnachtstag',         layer:'global', month:12, day:26, defaultColor:'#f59e0b'},
+  {id:'g-silvester',  name:'Silvester',               layer:'global', month:12, day:31, defaultColor:'#f59e0b'},
+  // 🇩🇪 Deutschland
+  {id:'de-arbeit',    name:'Tag der Arbeit',           layer:'de',    month:5,  day:1,  defaultColor:'#3b82f6'},
+  {id:'de-einheit',   name:'Tag d. Deutschen Einheit', layer:'de',    month:10, day:3,  defaultColor:'#3b82f6'},
+  {id:'de-karfr',     name:'Karfreitag',               layer:'de',    type:'easter', offset:-2, defaultColor:'#3b82f6'},
+  {id:'de-ostern',    name:'Ostersonntag',             layer:'de',    type:'easter', offset:0,  defaultColor:'#3b82f6'},
+  {id:'de-ostermo',   name:'Ostermontag',              layer:'de',    type:'easter', offset:1,  defaultColor:'#3b82f6'},
+  {id:'de-himmel',    name:'Christi Himmelfahrt',      layer:'de',    type:'easter', offset:39, defaultColor:'#3b82f6'},
+  {id:'de-pfingst',   name:'Pfingstmontag',            layer:'de',    type:'easter', offset:50, defaultColor:'#3b82f6'},
+  // 🏙 Bayern (München)
+  {id:'by-3koenige',  name:'Heilige Drei Könige',      layer:'city',  cityKey:'münchen', month:1,  day:6,  defaultColor:'#8b5cf6'},
+  {id:'by-fronl',     name:'Fronleichnam',             layer:'city',  cityKey:'münchen', type:'easter', offset:60, defaultColor:'#8b5cf6'},
+  {id:'by-mariae',    name:'Mariä Himmelfahrt',        layer:'city',  cityKey:'münchen', month:8,  day:15, defaultColor:'#8b5cf6'},
+  {id:'by-allerheil', name:'Allerheiligen',            layer:'city',  cityKey:'münchen', month:11, day:1,  defaultColor:'#8b5cf6'},
+];
+
+
+// ══ CITY REGIONS ═══════════════════════════════════════════════════════════
+// Stable region keys used by holiday system (NOT tied to table display name)
+const CITY_REGIONS = [
+  {key: null,       label: 'Keine'},
+  {key: 'münchen',  label: 'München (Bayern)'},
+  {key: 'hamburg',  label: 'Hamburg'},
+  {key: 'berlin',   label: 'Berlin (Berlin)'},
+];
+
+function _detectCityKey(name) {
+  const n = (name || '').toLowerCase();
+  if (n.includes('münchen') || n.includes('munich') || n.includes('munchen')) return 'münchen';
+  if (n.includes('hamburg')) return 'hamburg';
+  if (n.includes('berlin'))  return 'berlin';
+  return null;
+}
+
+const DEFAULT_HOTELS = {
+  "Roomers":     {bg:"#5B9BD5",fg:"#ffffff"},
+  "CYM":         {bg:"#1F4E79",fg:"#ffffff"},
+  "Adina":       {bg:"#FFC000",fg:"#000000"},
+  "Melia MCC":   {bg:"#7030A0",fg:"#ffffff"},
+  "Citadines":   {bg:"#BDD7EE",fg:"#000000"},
+  "Stay2Munich": {bg:"#C55A11",fg:"#ffffff"},
+  "BRH":         {bg:"#FFD966",fg:"#000000"},
+  "Isar":        {bg:"#A9D08E",fg:"#000000"},
+  "Insides":     {bg:"#548235",fg:"#ffffff"},
+};
+
+// ══ STATE ══════════════════════════════════════════════════════════════════
+let appData = null;   // in-memory app state
+
+let curYear  = new Date().getFullYear();
+let curMonth = new Date().getMonth();
+let activeCityId = null;
+
+// ── THEME ──────────────────────────────────────────────────────────────────
+(function(){
+  const t = localStorage.getItem('lk3_theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', t);
+})();
+function toggleTheme() {
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  const next = isLight ? 'dark' : 'light';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('lk3_theme', next);
+  updateThemeBtn();
+}
+function updateThemeBtn() {
+  const btn = document.getElementById('themeBtn');
+  if (!btn) return;
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  btn.title = isLight ? 'Dark Mode' : 'Light Mode';
+  const ico = btn.querySelector('i.ti');
+  if (ico) { ico.className = isLight ? 'ti ti-moon' : 'ti ti-sun'; }
+}
+
+let ms = {emp:null,day:null,hotel:null,shift:'Night',status:null,customLabel:'',customColor:'#6366f1',customOpacity:1,customTime:'',customHours:0,_multi:false};
+let dragSrcIdx = null;
+let zoomLevel = 100;
+
+// multi-select state
+let selectedCells = new Set(); // "emp|||day"
+let selMode = false;           // selection mode toggle
+let shiftHotelCityId = null;   // which city's hotels shown in shift modal
+
+// drag-select state
+let isDragSel = false;
+let isDragDesel = false;   // drag-to-deselect (inverse of drag-select)
+let dragHasMoved = false;
+let dragStartKey = null;
+
+// ── clipboard (copy/paste) ──────────────────────────────────────────────────
+// { items:[{dEmp,dDay,entry}], sourceTableId }
+let _clipboard = null;
+
+// ── new-city wizard state ────────────────────────────────────────────────────
+let _newCityRegion   = null;   // cityKey selected in "New Table" modal
+let _newCityTemplate = null;   // source cityId for template copy (null = blank)
+
+// undo/redo
+let undoStack = [];
+let redoStack = [];
+const MAX_HISTORY = 25;
+
+function saveSnapshot() {
+  undoStack.push(JSON.stringify(appData));
+  if (undoStack.length > MAX_HISTORY) undoStack.shift();
+  redoStack = [];
+  updateUndoBtns();
+}
+function updateUndoBtns() {
+  const u = document.getElementById('undoBtn'), r = document.getElementById('redoBtn');
+  if (u) u.disabled = !undoStack.length;
+  if (r) r.disabled = !redoStack.length;
+}
+function undo() {
+  if (!undoStack.length) return;
+  redoStack.push(JSON.stringify(appData));
+  appData = JSON.parse(undoStack.pop());
+  activeCityId = appData.activeCityId || Object.keys(appData.cities)[0];
+  selectedCells.clear(); if (selMode) { selMode=false; document.querySelector('.tbl-wrap')?.classList.remove('sel-active'); }
+  // Fix 3: undo is LOCAL ONLY — discard queued ops that now conflict with rolled-back state.
+  // Without this, a subsequent SyncQueue.flush() would push the un-done changes to Supabase.
+  SyncQueue.drain();
+  persist(); render(); updateUndoBtns(); updateSelBar();
+}
+function redo() {
+  if (!redoStack.length) return;
+  undoStack.push(JSON.stringify(appData));
+  appData = JSON.parse(redoStack.pop());
+  activeCityId = appData.activeCityId || Object.keys(appData.cities)[0];
+  selectedCells.clear(); if (selMode) { selMode=false; document.querySelector('.tbl-wrap')?.classList.remove('sel-active'); }
+  // Fix 3: redo is LOCAL ONLY — discard any ops queued before the redo was applied.
+  SyncQueue.drain();
+  persist(); render(); updateUndoBtns(); updateSelBar();
+}
+
+// ══ CRYPTO ════════════════════════════════════════════════════════════════
+async function deriveKey(password, saltBytes) {
+  const enc = new TextEncoder();
+  const keyMat = await crypto.subtle.importKey(
+    'raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']
+  );
+  return crypto.subtle.deriveKey(
+    {name:'PBKDF2', salt:saltBytes, iterations:100000, hash:'SHA-256'},
+    keyMat,
+    {name:'AES-GCM', length:256},
+    false,
+    ['encrypt','decrypt']
+  );
+}
+
+async function encrypt(data, key) {
+  const iv  = crypto.getRandomValues(new Uint8Array(12));
+  const enc = new TextEncoder();
+  const ct  = await crypto.subtle.encrypt({name:'AES-GCM',iv}, key, enc.encode(JSON.stringify(data)));
+  return {iv:[...iv], ct:[...new Uint8Array(ct)]};
+}
+
+async function decrypt(stored, key) {
+  const iv  = new Uint8Array(stored.iv);
+  const ct  = new Uint8Array(stored.ct);
+  const pt  = await crypto.subtle.decrypt({name:'AES-GCM',iv}, key, ct);
+  return JSON.parse(new TextDecoder().decode(pt));
+}
+
+// ══ STORAGE — IndexedDB (no 5 MB limit) ════════════════════════════════════
+// Thin async key-value wrapper around IndexedDB.
+// DB: 'lk3_db', store: 'kv', keys: 'data' (encrypted blob) + 'salt'
+const DB = (function(){
+  let _db = null;
+  function open(){
+    return new Promise((res,rej)=>{
+      if(_db) return res(_db);
+      const req = indexedDB.open('lk3_db', 1);
+      req.onupgradeneeded = e => e.target.result.createObjectStore('kv');
+      req.onsuccess = e => { _db = e.target.result; res(_db); };
+      req.onerror   = e => rej(e.target.error);
+    });
+  }
+  async function get(key){
+    const db = await open();
+    return new Promise((res,rej)=>{
+      const req = db.transaction('kv','readonly').objectStore('kv').get(key);
+      req.onsuccess = () => res(req.result ?? null);
+      req.onerror   = e => rej(e.target.error);
+    });
+  }
+  async function set(key, val){
+    const db = await open();
+    return new Promise((res,rej)=>{
+      const tx = db.transaction('kv','readwrite');
+      tx.objectStore('kv').put(val, key);
+      tx.oncomplete = res;
+      tx.onerror    = e => rej(e.target.error);
+    });
+  }
+  async function has(key){ return (await get(key)) !== null; }
+  return { get, set, has };
+})();
+
+async function persist() {
+  if (!appData) return;
+  await DB.set('data', JSON.stringify(appData));  // plaintext — encrypted at rest by Supabase
+}
+
+// getSalt() and hasData() removed — auth handled by Supabase
+
+// ══ AUTH ═══════════════════════════════════════════════════════════════════
+function authErr(msg) { document.getElementById('authErr').textContent = msg; }
+
+function createDefaultAppData() {
+  const cityId = 'c_' + Date.now();
+  return {
+    version: APP_VERSION,
+    syncVersion: 1,
+    cities: { [cityId]: {
+      name: 'München',
+      cityKey: 'münchen',
+      employees: [
+        "Wagner, Julian","Ünal, Batin","Vykhodets, Artem","Kerbl, Michael",
+        "Aljammal, Ahmad","Hakimzada, Rahatullah","Walter, Sebastian","Blanco, Raquel",
+        "Held, Patrick","Azizbek Kyzy, Nasipa","Amanov, Akram","Kerbl, Martin"
+      ].map(name => ({id: newEmpId(), name})),
+      schedule: {},
+      hotels: JSON.parse(JSON.stringify(DEFAULT_HOTELS)),
+    }},
+    activeCityId: cityId,
+    holidaySettings: {layers:['global','de','city'], colorOverrides:{}, disabled:[], events:[]},
+    customColors: {},
+  };
+}
+
+// ── Supabase OTP Auth ─────────────────────────────────────────────────────────
+async function doRequestOTP() {
+  const email = (document.getElementById('authEmail').value || '').trim();
+  if (!email) { authErr('E-Mail eingeben'); return; }
+  const btn = document.getElementById('otpRequestBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="auth-spinner"></span> Wird gesendet…';
+  authErr('');
+  const { error } = await _supa.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
+  if (error) {
+    authErr(error.message);
+    btn.disabled = false; btn.textContent = 'Code senden';
+  } else {
+    document.getElementById('otpRequestForm').style.display = 'none';
+    document.getElementById('otpVerifyForm').style.display  = 'block';
+    document.getElementById('authSub').textContent = `Code an ${email} gesendet.`;
+    authErr('');
+    setTimeout(() => document.getElementById('authOTP').focus(), 100);
+  }
+}
+
+async function doVerifyOTP() {
+  const email = (document.getElementById('authEmail').value || '').trim();
+  const token = (document.getElementById('authOTP').value || '').trim();
+  if (!token) { authErr('Code eingeben'); return; }
+  const btn = document.getElementById('otpVerifyBtn');
+  btn.disabled = true; btn.innerHTML = '<span class="auth-spinner"></span> Wird geprüft…';
+  authErr('');
+  const { data, error } = await _supa.auth.verifyOtp({ email, token, type: 'email' });
+  if (error) {
+    authErr('Ungültiger oder abgelaufener Code');
+    btn.disabled = false; btn.textContent = 'Bestätigen';
+  } else {
+    currentUser = { id: data.user.id, email: data.user.email };
+    await afterAuth();
+  }
+}
+
+function showOTPRequest() {
+  document.getElementById('otpVerifyForm').style.display  = 'none';
+  document.getElementById('otpRequestForm').style.display = 'block';
+  document.getElementById('authSub').textContent = 'E-Mail eingeben um fortzufahren.';
+  authErr('');
+}
+
+// ── syncOrgStructure: push cities + employees to Supabase (v12b) ─────────────
+// Called after login/migration. Ensures Supabase has all cities and employees
+// so that entries (which FK-reference them) can be upserted without errors.
+// Safe to call repeatedly — all upserts are idempotent (onConflict: id).
+async function syncOrgStructure() {
+  if (!_supa || !currentUser || !appData) return;
+  // Get org_id from profiles table
+  const { data: prof } = await _supa
+    .from('profiles').select('org_id').eq('id', currentUser.id).single();
+  if (!prof?.org_id) { console.warn('[Supabase] No profile found for user'); return; }
+  const orgId = prof.org_id;
+  const now   = new Date().toISOString();
+
+  for (const [cityId, c] of Object.entries(appData.cities)) {
+    // Upsert city row
+    const { error: ce } = await _supa.from('cities').upsert({
+      id:         cityId,
+      org_id:     orgId,
+      name:       c.name || cityId,
+      city_key:   c.cityKey || null,
+      hotels:     c.hotels  || {},
+      updated_at: now
+    }, { onConflict: 'id' });
+    if (ce) { console.warn('[Supabase] city upsert error:', ce.message); continue; }
+
+    // Upsert employees for this city
+    const emps = Array.isArray(c.employees) ? c.employees : [];
+    for (let i = 0; i < emps.length; i++) {
+      const emp = emps[i];
+      if (!emp?.id) continue;
+      const { error: ee } = await _supa.from('employees').upsert({
+        id:         emp.id,
+        city_id:    cityId,
+        name:       emp.name || emp.id,
+        sort_order: i,
+        updated_at: now
+      }, { onConflict: 'id' });
+      if (ee) console.warn('[Supabase] employee upsert error:', ee.message);
+    }
+  }
+  console.log('[Supabase] org structure synced —', Object.keys(appData.cities).length, 'cities');
+  // Now flush any pending entries that were blocked by missing FK rows
+  SyncQueue.flush();
+}
+
+// Called after successful Supabase auth — loads local data or triggers migration
+async function afterAuth() {
+  const raw = await DB.get('data');
+  // Detect old encrypted blob format {iv:[...], ct:[...]}
+  if (raw && typeof raw === 'object' && Array.isArray(raw.iv) && Array.isArray(raw.ct)) {
+    // Old encrypted data — show one-time migration form
+    document.getElementById('otpVerifyForm').style.display  = 'none';
+    document.getElementById('otpRequestForm').style.display = 'none';
+    document.getElementById('migrationForm').style.display  = 'block';
+    document.getElementById('authSub').textContent = 'Einmalige Datenmigration';
+    return;
+  }
+  // Plaintext data (v11+)
+  let data = null;
+  if (raw) { try { data = migrate(JSON.parse(raw)); } catch(e) {} }
+  appData = data || createDefaultAppData();
+  await persist();
+  showApp();
+  // v12b: sync org structure to Supabase, then flush pending entries
+  syncOrgStructure().catch(e => console.warn('[Supabase] syncOrgStructure:', e));
+}
+
+// One-time migration: decrypt old data with old password → save plaintext
+async function doMigrate() {
+  const pw = (document.getElementById('migPw').value || '');
+  if (!pw) { authErr('Passwort eingeben'); return; }
+  authErr('');
+  try {
+    const saltRaw = await DB.get('salt');
+    const saltBytes = new Uint8Array(saltRaw);
+    const key  = await deriveKey(pw, saltBytes);
+    const blob = await DB.get('data');
+    const data = await decrypt(blob, key);
+    appData = migrate(data);
+    await persist();               // now saved as plaintext
+    await DB.set('salt', null);    // salt no longer needed
+    showApp();
+    // v12b: sync org structure after migration
+    syncOrgStructure().catch(e => console.warn('[Supabase] syncOrgStructure:', e));
+  } catch(e) {
+    authErr('Falsches Passwort');
+  }
+}
+
+async function skipMigration() {
+  if (!confirm('Alte Daten löschen und neu starten?')) return;
+  await DB.set('data', null);
+  await DB.set('salt', null);
+  appData = createDefaultAppData();
+  await persist();
+  showApp();
+}
+
+function showApp() {
+  document.getElementById('authScreen').style.display = 'none';
+  const app = document.getElementById('app');
+  app.style.display = 'flex';
+  app.style.flexDirection = 'column';
+  activeCityId = appData.activeCityId || Object.keys(appData.cities)[0];
+  undoStack = []; redoStack = [];
+  render();
+  updateUndoBtns();
+  updateThemeBtn();
+  // Populate account info in Settings
+  const emailEl = document.getElementById('settingsUserEmail');
+  if (emailEl && currentUser) emailEl.textContent = currentUser.email;
+}
+
+async function signOut() {
+  appData = null; currentUser = null;
+  if (_supa) await _supa.auth.signOut();
+  closeModal('settingsOv');
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('authScreen').style.display = 'flex';
+  showOTPRequest();
+  authErr('');
+}
+
+// ══ MIGRATION ══════════════════════════════════════════════════════════════
+function migrate(data) {
+  // v1/v2: flat structure (no cities)
+  if (!data.cities) {
+    const cityId = 'c_' + Date.now();
+    return {
+      version: APP_VERSION,
+      cities: { [cityId]: {
+        name: 'Standard',
+        employees: data.employees || [],
+        schedule: data.schedule || {},
+        hotels: data.hotels || JSON.parse(JSON.stringify(DEFAULT_HOTELS)),
+      }},
+      activeCityId: cityId,
+    };
+  }
+  // v3 with globalHotels → distribute to each city
+  if (data.globalHotels) {
+    Object.keys(data.cities).forEach(id => {
+      if (!data.cities[id].hotels)
+        data.cities[id].hotels = JSON.parse(JSON.stringify(data.globalHotels));
+    });
+    delete data.globalHotels;
+  }
+  // ensure every city has a hotels object
+  Object.keys(data.cities).forEach(id => {
+    if (!data.cities[id].hotels)
+      data.cities[id].hotels = JSON.parse(JSON.stringify(DEFAULT_HOTELS));
+  });
+  // ensure holidaySettings
+  if (!data.holidaySettings) {
+    data.holidaySettings = {layers:['global','de','city'], colorOverrides:{}, disabled:[], events:[]};
+  }
+  // ensure customColors dictionary
+  if (!data.customColors) data.customColors = {};
+  // v5: add stable cityKey to every city (for holiday region decoupled from name)
+  Object.keys(data.cities).forEach(id => {
+    if (data.cities[id].cityKey === undefined) {
+      data.cities[id].cityKey = _detectCityKey(data.cities[id].name);
+    }
+  });
+  // v6: stable employee IDs — convert string[] to {id,name}[]
+  Object.keys(data.cities).forEach(id => {
+    const c = data.cities[id];
+    if (!c.employees || c.employees.length === 0) return;
+    if (typeof c.employees[0] === 'string') {
+      // build name→id map first, then remap schedule keys
+      const idMap = {};
+      c.employees = c.employees.map(name => {
+        const empId = 'emp_' + Math.random().toString(36).slice(2, 11);
+        idMap[name] = empId;
+        return {id: empId, name};
+      });
+      if (c.schedule) {
+        Object.keys(c.schedule).forEach(year => {
+          Object.keys(c.schedule[year]).forEach(month => {
+            const mo = c.schedule[year][month];
+            Object.keys(mo).forEach(oldKey => {
+              if (idMap[oldKey]) {
+                mo[idMap[oldKey]] = mo[oldKey];
+                delete mo[oldKey];
+              }
+            });
+          });
+        });
+      }
+    }
+  });
+  // v8: add syncVersion — tracks sync protocol version; no structural data change
+  if (data.syncVersion === undefined) data.syncVersion = 1;
+  // v9: no structural change — mutation pipeline (schedulePersist, drain, LWW fixes) is code-only
+  data.version = APP_VERSION;
+  return data;
+}
+
+// ══ CITY HELPERS ══════════════════════════════════════════════════════════
+function city()      { return appData.cities[activeCityId]; }
+function employees() { return city().employees; }
+function employeeName(id) {
+  const e = employees().find(e => e.id === id);
+  return e ? e.name : id;
+}
+function employeeIds() { return employees().map(e => e.id); }
+function newEmpId()    { return 'emp_' + Math.random().toString(36).slice(2, 11); }
+function hotels()    { return city().hotels; }
+// find hotel across all cities (for rendering entries from other cities)
+function findHotel(name) {
+  if (city().hotels && city().hotels[name]) return city().hotels[name];
+  for (const c of Object.values(appData.cities)) {
+    if (c.hotels && c.hotels[name]) return c.hotels[name];
+  }
+  return null;
+}
+
+function entry(emp, day)        { return city().schedule?.[curYear]?.[curMonth]?.[emp]?.[day] || null; }
+function setEntry(emp, day, val){
+  const s = city().schedule;
+  if (!s[curYear])              s[curYear] = {};
+  if (!s[curYear][curMonth])    s[curYear][curMonth] = {};
+  if (!s[curYear][curMonth][emp]) s[curYear][curMonth][emp] = {};
+  if (val===null) {
+    delete s[curYear][curMonth][emp][day];
+    // Fix 2: stamp deletedAt so remote LWW can compare deletion ops by time
+    SyncQueue.push({city:activeCityId, emp, year:curYear, month:curMonth, day, val:null, deletedAt:Date.now()});
+  } else {
+    val.updatedAt = Date.now();
+    s[curYear][curMonth][emp][day] = val;
+    SyncQueue.push({city:activeCityId, emp, year:curYear, month:curMonth, day, val});
+  }
+  // Fix 1: coalesce N persist() calls from bulk ops into one microtask write
+  schedulePersist();
+  // v12: debounced Supabase sync — 1.5s after last mutation
+  scheduleFlush();
+}
+
+function daysInMonth(y,m) { return new Date(y,m+1,0).getDate(); }
+function isWE(y,m,d)      { const w=new Date(y,m,d).getDay(); return w===0||w===6; }
+function wd(y,m,d)        { return new Date(y,m,d).getDay(); }
+
+// ── HOLIDAY HELPERS ────────────────────────────────────────────────────────
+function getHolidaySettings() {
+  if (!appData.holidaySettings) {
+    appData.holidaySettings = {layers:['global','de','city'], colorOverrides:{}, disabled:[], events:[]};
+  }
+  return appData.holidaySettings;
+}
+// getCityKey: read stable cityKey from the city object (decoupled from display name)
+function getCityKey(cityObj) {
+  if (cityObj && typeof cityObj === 'object') return cityObj.cityKey ?? null;
+  // legacy: accept string (auto-detect) — used only during migration path
+  if (typeof cityObj === 'string') return _detectCityKey(cityObj);
+  return null;
+}
+function easterDate(year) {
+  // Anonymous Gregorian algorithm
+  const a=year%19,b=Math.floor(year/100),c=year%100;
+  const d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3);
+  const h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4;
+  const l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451);
+  const month=Math.floor((h+l-7*m+114)/31),day=((h+l-7*m+114)%31)+1;
+  return {month,day}; // 1-indexed month
+}
+function getHolidaysForMonth(year, monthIdx) {
+  // monthIdx: 0-11 (same as curMonth)
+  // Returns Map<day, [{id,name,color,layer}]>
+  if (!appData) return new Map();
+  const hs = getHolidaySettings();
+  const cityKey = getCityKey(city());
+  const easter = easterDate(year);
+  const result = new Map();
+  const add = (day,hd) => { if(!result.has(day))result.set(day,[]); result.get(day).push(hd); };
+
+  BUILT_IN_HOLIDAYS.forEach(h => {
+    if (hs.disabled.includes(h.id)) return;
+    if (!hs.layers.includes(h.layer)) return;
+    if (h.layer==='city' && h.cityKey !== cityKey) return;
+    let hm, hd;
+    if (h.type==='easter') {
+      const e0 = new Date(year, easter.month-1, easter.day);
+      const dt = new Date(e0.getTime() + h.offset*86400000);
+      hm=dt.getMonth()+1; hd=dt.getDate();
+    } else { hm=h.month; hd=h.day; }
+    if (hm===monthIdx+1) {
+      add(hd, {id:h.id, name:h.name, color:hs.colorOverrides[h.id]||h.defaultColor, layer:h.layer});
+    }
+  });
+
+  (hs.events||[]).forEach(ev => {
+    if (!ev.date) return;
+    if (ev.cityKey && ev.cityKey !== cityKey) return;
+    const s=new Date(ev.date+'T00:00:00');
+    const e=ev.dateTo?new Date(ev.dateTo+'T00:00:00'):new Date(s);
+    const cur=new Date(s);
+    while(cur<=e){
+      if(cur.getFullYear()===year&&cur.getMonth()===monthIdx)
+        add(cur.getDate(),{id:ev.id,name:ev.name,color:ev.color||'#10b981',layer:'event'});
+      cur.setDate(cur.getDate()+1);
+    }
+  });
+  return result;
+}
+
+function empTotal(emp) {
+  const mo = city().schedule?.[curYear]?.[curMonth]?.[emp] || {};
+  return Object.values(mo).reduce((s,e)=>s+(parseFloat(e.hours)||0),0);
+}
+function dayTotal(day) {
+  return employees().reduce((s,empObj)=>{
+    const e=entry(empObj.id,day); return s+(e&&!e.status?(parseFloat(e.hours)||0):0);
+  },0);
+}
+function lum(hex){
+  const r=parseInt(hex.slice(1,3),16)/255,g=parseInt(hex.slice(3,5),16)/255,b=parseInt(hex.slice(5,7),16)/255;
+  return .2126*r+.7152*g+.0722*b;
+}
+function fgFor(bg){return lum(bg)>.4?'#000000':'#ffffff';}
+
+// ══ CUSTOM COLOR HELPERS ════════════════════════════════════════════════════
+function hexToRgba(hex, alpha){
+  const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+function hexLuma(hex){
+  const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
+  return (0.299*r+0.587*g+0.114*b)/255;
+}
+// autoFgColor: pick #ffffff or #1a1a1a based on *effective* blended luminance
+// Works for any cell: custom-color with opacity, or solid preset colors.
+// opacity = 1.0 for fully opaque cells (hotel, presets).
+function autoFgColor(hex, opacity){
+  if(!hex||hex.length<7) return '#ffffff';
+  opacity = (opacity==null) ? 1 : opacity;
+  const isLight = document.documentElement.getAttribute('data-theme')==='light';
+  const bgLuma  = isLight ? 0.95 : 0.012;
+  const effLuma = hexLuma(hex) * opacity + bgLuma * (1 - opacity);
+  // Use a slightly tighter threshold (0.45) so borderline colors get white
+  return effLuma > 0.45 ? '#1a1a1a' : '#ffffff';
+}
+
+// backward compat: customColors[label] can be a string (old) or {color,opacity} (new)
+function getCustomSaved(label){
+  const s = appData?.customColors?.[label?.trim()];
+  if (!s) return null;
+  return typeof s === 'string' ? {color:s, opacity:1} : s;
+}
+function setOpacityUI(opacity){
+  const pct = Math.round(opacity*100);
+  document.getElementById('customOpacityInput').value = pct;
+  document.getElementById('customOpacityVal').textContent = pct+'%';
+}
+
+// ══ SPAN HELPERS ════════════════════════════════════════════════════════════
+const MERGE_STATUSES = new Set(['Off','Urlaub','Krank','Custom']);
+function mergeKey(e){
+  if(!e||!e.status||!MERGE_STATUSES.has(e.status)) return null;
+  return e.status==='Custom' ? 'Custom::'+(e.customLabel||'')+'|'+(e.customTime||'') : e.status;
+}
+function computeSpans(emp, days){
+  const info={};
+  let d=1;
+  while(d<=days){
+    const mk=mergeKey(entry(emp,d));
+    if(mk!==null){
+      let len=1;
+      while(d+len<=days && mergeKey(entry(emp,d+len))===mk) len++;
+      for(let i=0;i<len;i++) info[d+i]={len,pos:i};
+      d+=len;
+    } else {
+      info[d]={len:1,pos:0};
+      d++;
+    }
+  }
+  return info;
+}
+
+// ══ RENDER ═════════════════════════════════════════════════════════════════
+function render() {
+  if (!appData) return;
+  document.getElementById('monthLabel').textContent = `${MONTHS[curMonth]} ${curYear}`;
+  renderCityTabs();
+  renderLegend();
+  renderTable();
+}
+
+function renderCityTabs() {
+  const bar = document.getElementById('cityTabs');
+  bar.innerHTML = '';
+  Object.entries(appData.cities).forEach(([id,c])=>{
+    const tab = document.createElement('div');
+    tab.className = 'city-tab' + (id===activeCityId?' active':'');
+    tab.innerHTML = `<span onclick="switchCity('${id}')">${c.name}</span>
+      <span class="city-tab-del" onclick="deleteCity('${id}')"><i class="ti ti-x"></i></span>`;
+    bar.appendChild(tab);
+  });
+  const add = document.createElement('div');
+  add.className='city-add'; add.textContent='+ Neue Tabelle'; add.onclick=openAddCity;
+  bar.appendChild(add);
+}
+
+function renderLegend() {
+  const bar = document.getElementById('legendBar');
+  // build full HTML in one go to avoid innerHTML+= re-parse issues
+  let html = '<span class="legend-lbl">Hotels:</span>';
+  Object.entries(hotels()).forEach(([name,{bg}])=>{
+    html += `<div class="legend-item"><span class="legend-dot" style="background:${bg}"></span>${name}</div>`;
+  });
+  html += '<div class="legend-sep"></div>';
+  [
+    ['<i class="ti ti-minus"></i>','var(--off-fg)','Off'],
+    ['<i class="ti ti-sun"></i>','var(--vac-fg)','Urlaub'],
+    ['<i class="ti ti-circle-x"></i>','var(--sick-fg)','Krank']
+  ].forEach(([ic,c,l])=>{
+    html += `<div class="legend-item"><span style="color:${c};display:flex;align-items:center;">${ic}</span><span style="color:${c}">${l}</span></div>`;
+  });
+
+  // Holiday chips — show each unique holiday visible in current month
+  const hdMap = getHolidaysForMonth(curYear, curMonth);
+  if (hdMap.size > 0) {
+    html += '<div class="legend-sep"></div>';
+    const seen = new Set();
+    [...hdMap.entries()].sort((a,b)=>a[0]-b[0]).forEach(([day,hdays])=>{
+      hdays.forEach(hd => {
+        const k = hd.id || hd.name;
+        if (seen.has(k)) return;
+        seen.add(k);
+        const safe = hd.name.replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        const dateLbl = `${day}. ${MONTHS[curMonth]}`;
+        html += `<div class="hday-chip" style="background:${hd.color};" title="${dateLbl} — ${safe}">${safe}</div>`;
+      });
+    });
+  }
+  bar.innerHTML = html;
+}
+
+function renderTable() {
+  const days = daysInMonth(curYear, curMonth);
+  const tbl  = document.getElementById('tbl');
+  tbl.innerHTML='';
+  const thead=tbl.createTHead(), hr=thead.insertRow();
+
+  // Pre-compute holidays for this month
+  const hdMap = getHolidaysForMonth(curYear, curMonth);
+
+  const thN=document.createElement('th'); thN.className='th-name'; thN.textContent='MITARBEITER'; hr.appendChild(thN);
+  for(let d=1;d<=days;d++){
+    const we=isWE(curYear,curMonth,d), w=wd(curYear,curMonth,d);
+    const th=document.createElement('th'); th.className='th-day'+(we?' we':'');
+    th.innerHTML=`${d}<span class="th-dn">${DAYS[w]}</span>`;
+    if (hdMap.has(d)) {
+      const hdays = hdMap.get(d);
+      const color = hdays[0].color;
+      th.classList.add('hday');
+      th.style.setProperty('--hday-color', color);
+      th.title = hdays.map(h=>h.name).join(' · ');
+    }
+    hr.appendChild(th);
+  }
+  const thT=document.createElement('th'); thT.className='th-tot'; thT.textContent='Std.'; hr.appendChild(thT);
+
+  const tbody=tbl.createTBody();
+  employees().forEach((empObj,ei)=>{
+    const emp=empObj.id, empName=empObj.name;
+    const rM=tbody.insertRow(), rH=tbody.insertRow();
+
+    // name cell — draggable
+    const tdN=document.createElement('td');
+    tdN.className='td-name'; tdN.rowSpan=2; tdN.draggable=true;
+    tdN.dataset.idx=ei;
+    tdN.innerHTML=`<div class="td-name-inner">
+      <span class="drag-handle" title="Ziehen zum Verschieben"><i class="ti ti-grip-vertical"></i></span>
+      <span class="row-sel-btn" onclick="event.stopPropagation();toggleRowSel('${emp}');" title="Ganze Zeile auswählen"><i class="ti ti-layout-rows"></i></span>
+      <span class="emp-name" ondblclick="startRenameEmp('${emp}',this)">${empName}</span>
+      <button class="emp-edit-btn" onclick="startRenameEmp('${emp}',this.previousElementSibling)" title="Umbenennen"><i class="ti ti-pencil"></i></button>
+      <button class="del-btn" onclick="removeEmp(${ei})" title="Löschen"><i class="ti ti-x"></i></button>
+    </div>`;
+    tdN.addEventListener('dragstart', e=>{ dragSrcIdx=ei; tdN.classList.add('dragging'); e.dataTransfer.effectAllowed='move'; });
+    tdN.addEventListener('dragend',   ()=>{ tdN.classList.remove('dragging'); document.querySelectorAll('.td-name').forEach(n=>n.classList.remove('drag-over')); });
+    tdN.addEventListener('dragover',  e=>{ e.preventDefault(); e.dataTransfer.dropEffect='move'; tdN.classList.add('drag-over'); });
+    tdN.addEventListener('dragleave', ()=>tdN.classList.remove('drag-over'));
+    tdN.addEventListener('drop',      e=>{ e.preventDefault(); dropEmp(ei); });
+    rM.appendChild(tdN);
+
+    const siAll=computeSpans(emp,days);
+    for(let d=1;d<=days;d++){
+      const we=isWE(curYear,curMonth,d), e=entry(emp,d);
+      const si=siAll[d];
+      const tdS=document.createElement('td');
+      const sk=emp+'|||'+d;
+      tdS.dataset.selkey=sk;
+      tdS.className='td-shift'+(we?' we-bg':'')+(e?'':' empty');
+      if(selectedCells.has(sk)) tdS.classList.add('sel-cell');
+      // span: hide right border on all but last cell in a run
+      if(si.len>1 && si.pos<si.len-1) tdS.classList.add('span-inner');
+      if(e){
+        if(e.status){
+          const m=STATUS_META[e.status];
+          tdS.classList.add(m.cls);
+          // show label only in the middle cell of the span
+          const mid=Math.floor((si.len-1)/2);
+          // apply per-cell custom color + opacity
+          if(e.status==='Custom'){
+            const col=e.customColor||'#6366f1';
+            const op=e.customOpacity??1;
+            const fg=autoFgColor(col,op);
+            tdS.style.background=hexToRgba(col,op);
+            tdS.style.color=fg;
+          }
+          if(si.pos===mid){
+            if(e.status==='Custom'){
+              const lbl=(e.customLabel||'').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+              const time=(e.customTime||'').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+              const fg=autoFgColor(e.customColor||'#6366f1', e.customOpacity??1);
+              const cs=` style="color:${fg}"`;
+              tdS.innerHTML=time
+                ? `<div class="sh-wrap"><span class="sh-hotel"${cs}>${lbl}</span><span class="sh-type"${cs}>${time}</span></div>`
+                : `<div class="sh-wrap"><span class="sh-hotel"${cs}>${lbl}</span></div>`;
+            } else {
+              const lbl=`${m.icon} ${m.lbl}`;
+              tdS.innerHTML=`<div class="sh-wrap"><span class="sh-hotel">${lbl}</span></div>`;
+            }
+          } else {
+            // background only, no visible text
+            tdS.classList.add('span-ghost');
+            tdS.innerHTML=`<div class="sh-wrap"><span class="sh-hotel"></span></div>`;
+          }
+        } else if(e.hotel){
+          const h=findHotel(e.hotel);
+          if(h){
+            const hotelFg=autoFgColor(h.bg,1);
+            tdS.style.background=h.bg; tdS.style.color=hotelFg;
+            tdS.innerHTML=`<div class="sh-wrap"><span class="sh-hotel" style="color:${hotelFg}">${e.hotel}</span><span class="sh-type" style="color:${hotelFg}">${e.shift||''}</span></div>`;
+          }
+        }
+      }
+      // ── drag-select / drag-deselect: mousedown starts tracking ──
+      tdS.addEventListener('mousedown', ev => {
+        if (ev.button !== 0 || ev.ctrlKey || ev.metaKey) return;
+        const k = emp + '|||' + d;
+        dragHasMoved = false;
+        dragStartKey = k;
+        document.body.classList.add('drag-selecting');
+        ev.preventDefault();
+        // if already selected in selMode → start deselect drag
+        if (selMode && selectedCells.has(k)) {
+          isDragDesel = true;
+        } else {
+          isDragSel = true;
+        }
+      });
+      // ── drag-select: mouseover selects cells while held ──
+      tdS.addEventListener('mouseover', () => {
+        const k = emp + '|||' + d;
+
+        // ── drag-DESELECT branch ──
+        if (isDragDesel) {
+          if (k === dragStartKey && !dragHasMoved) return;
+          if (!dragHasMoved) {
+            // first move: deselect the start cell too
+            dragHasMoved = true;
+            const startEl = document.querySelector(`[data-selkey="${CSS.escape(dragStartKey)}"]`);
+            if (startEl && selectedCells.has(dragStartKey)) {
+              selectedCells.delete(dragStartKey);
+              startEl.classList.remove('sel-cell');
+            }
+          }
+          if (selectedCells.has(k)) {
+            selectedCells.delete(k);
+            tdS.classList.remove('sel-cell');
+          }
+          refreshSelBorders();
+          updateSelBar();
+          return;
+        }
+
+        // ── drag-SELECT branch ──
+        if (!isDragSel) return;
+        if (k === dragStartKey) return;
+        if (!dragHasMoved) {
+          dragHasMoved = true;
+          if (!selMode) toggleSelMode();
+          const startEl = document.querySelector(`[data-selkey="${CSS.escape(dragStartKey)}"]`);
+          if (startEl && !selectedCells.has(dragStartKey)) {
+            selectedCells.add(dragStartKey);
+            startEl.classList.add('sel-cell');
+          }
+        }
+        if (!selectedCells.has(k)) {
+          selectedCells.add(k);
+          tdS.classList.add('sel-cell');
+        }
+        refreshSelBorders();
+        updateSelBar();
+      });
+      // ── click: suppress if drag happened, otherwise normal behavior ──
+      tdS.onclick = ev => {
+        if (dragHasMoved) { dragHasMoved = false; return; }
+        if (ev.ctrlKey || ev.metaKey || selMode) { toggleCellSel(emp, d, tdS); }
+        else { openShift(emp, d); }
+      };
+      rM.appendChild(tdS);
+
+      const tdH=document.createElement('td'); tdH.className='td-hours'+(we?' we-bg':'');
+      if(si.len>1 && si.pos<si.len-1) tdH.classList.add('span-inner');
+      if(e&&(!e.status||e.hours)){
+        const hrs=e.hours||0;
+        const hCell=document.createElement('div'); hCell.className='hrs-cell';
+        const dec=document.createElement('span'); dec.className='hrs-side hrs-dec'; dec.textContent='−0.5';
+        const val=document.createElement('span'); val.className='hrs-val'+(hrs?'':' empty-val'); val.textContent=hrs?hrs:'–';
+        const inc=document.createElement('span'); inc.className='hrs-side hrs-inc'; inc.textContent='+0.5';
+        dec.onclick=ev=>{ ev.stopPropagation(); adjustHours(emp,d,-0.5); };
+        inc.onclick=ev=>{ ev.stopPropagation(); adjustHours(emp,d,+0.5); };
+        val.ondblclick=ev=>{ ev.stopPropagation(); startHrsEdit(tdH,emp,d); };
+        hCell.appendChild(dec); hCell.appendChild(val); hCell.appendChild(inc);
+        tdH.appendChild(hCell);
+      }
+      rH.appendChild(tdH);
+    }
+
+    const tdT=document.createElement('td'); tdT.className='td-tot'; tdT.rowSpan=2; tdT.id=`tot${ei}`;
+    const t=empTotal(emp); tdT.textContent=t>0?t.toFixed(1):'–'; if(t===0)tdT.classList.add('zero');
+    rM.appendChild(tdT);
+  });
+
+  // sum row
+  const rS=tbody.insertRow(); rS.className='tr-sum';
+  const tdSN=rS.insertCell(); tdSN.className='td-name'; tdSN.textContent='Σ Stunden / Tag';
+  for(let d=1;d<=days;d++){
+    const td=rS.insertCell(); const t=dayTotal(d); td.textContent=t>0?t.toFixed(0):'–';
+  }
+  const tdST=rS.insertCell(); tdST.className='td-tot';
+  const all=employees().reduce((s,empObj)=>s+empTotal(empObj.id),0); tdST.textContent=all>0?all.toFixed(1):'–';
+  refreshSelBorders();
+}
+
+function updateTotals(){
+  employees().forEach((empObj,ei)=>{
+    const el=document.getElementById(`tot${ei}`); if(!el)return;
+    const t=empTotal(empObj.id); el.textContent=t>0?t.toFixed(1):'–'; el.classList.toggle('zero',t===0);
+  });
+}
+
+// ── refreshHoursCell: targeted hours-row update (Task 3 — render modularisation) ──
+// Rebuilds the td-hours cell for one (emp, day) without re-rendering the whole table.
+// Safe ONLY when e.hours changed but the shift type / hotel did NOT change.
+// Callers: adjustHours(), startHrsEdit() commit.
+// Falls back to renderTable() if the cell cannot be located in the DOM.
+function refreshHoursCell(emp, day) {
+  const e   = entry(emp, day);
+  const ei  = employeeIds().indexOf(emp);
+  if (ei < 0) { renderTable(); return; }
+  const tbody = document.querySelector('#tbl tbody');
+  if (!tbody)  { renderTable(); return; }
+  // Each employee occupies 2 tbody rows (shift row + hours row).
+  // The hours row is at index ei*2 + 1; the sum row is at the very end.
+  const hoursRow = tbody.rows[ei * 2 + 1];
+  if (!hoursRow) { renderTable(); return; }
+  // Hours row cells: one <td> per calendar day (no name col, no total col).
+  const td = hoursRow.cells[day - 1];
+  if (!td) { renderTable(); return; }
+  // Rebuild cell content (mirrors the logic in renderTable).
+  td.innerHTML = '';
+  if (e && (!e.status || e.hours)) {
+    const hrs  = e.hours || 0;
+    const hCell = document.createElement('div'); hCell.className = 'hrs-cell';
+    const dec   = document.createElement('span'); dec.className = 'hrs-side hrs-dec'; dec.textContent = '−0.5';
+    const val   = document.createElement('span'); val.className = 'hrs-val' + (hrs ? '' : ' empty-val'); val.textContent = hrs ? hrs : '–';
+    const inc   = document.createElement('span'); inc.className = 'hrs-side hrs-inc'; inc.textContent = '+0.5';
+    dec.onclick    = ev => { ev.stopPropagation(); adjustHours(emp, day, -0.5); };
+    inc.onclick    = ev => { ev.stopPropagation(); adjustHours(emp, day, +0.5); };
+    val.ondblclick = ev => { ev.stopPropagation(); startHrsEdit(td, emp, day); };
+    hCell.appendChild(dec); hCell.appendChild(val); hCell.appendChild(inc);
+    td.appendChild(hCell);
+  }
+}
+
+// ══ INTERACTION GUARD ══════════════════════════════════════════════════════
+function isInteracting() {
+  // True while user is drag-selecting or has any modal open.
+  // Use this before any async operation to avoid clobbering in-progress edits.
+  if (isDragSel || isDragDesel) return true;
+  return document.querySelectorAll('.modal-ov.open').length > 0;
+}
+
+// ══ HOURS ADJUST ═══════════════════════════════════════════════════════════
+function adjustHours(emp, d, delta) {
+  const cur = entry(emp, d); if (!cur) return;
+  saveSnapshot();
+  const newVal = Math.max(0, Math.min(24, parseFloat((+(cur.hours||0) + delta).toFixed(1))));
+  cur.hours = newVal;
+  setEntry(emp, d, cur);
+  // T4: targeted update — only hours changed, no span recalculation needed
+  refreshHoursCell(emp, d);
+  updateTotals();
+}
+function startHrsEdit(tdH, emp, d) {
+  const cur = entry(emp, d); if (!cur) return;
+  const inp = document.createElement('input');
+  inp.type='number'; inp.step='.5'; inp.min='0'; inp.max='24';
+  inp.value = cur.hours || ''; inp.className='hrs-input-edit';
+  tdH.innerHTML=''; tdH.appendChild(inp);
+  inp.focus(); inp.select();
+  const commit = () => {
+    const c = entry(emp, d); if (!c) return;
+    saveSnapshot(); c.hours = parseFloat(inp.value)||0; setEntry(emp, d, c);
+    // T4: targeted update — only hours changed
+    refreshHoursCell(emp, d); updateTotals();
+  };
+  inp.onblur = commit;
+  inp.onkeydown = ev => { if(ev.key==='Enter') inp.blur(); if(ev.key==='Escape'){ renderTable(); } };
+}
+
+// ══ DRAG & DROP ════════════════════════════════════════════════════════════
+function dropEmp(targetIdx) {
+  if (dragSrcIdx===null || dragSrcIdx===targetIdx) { dragSrcIdx=null; return; }
+  saveSnapshot();
+  const emps = employees();
+  const moved = emps.splice(dragSrcIdx, 1)[0];
+  // after first splice, indices after dragSrcIdx shift left by 1
+  const adj = dragSrcIdx < targetIdx ? targetIdx - 1 : targetIdx;
+  emps.splice(adj, 0, moved);
+  dragSrcIdx = null;
+  persist(); render();
+}
+
+// ══ SHIFT MODAL ════════════════════════════════════════════════════════════
+function renderShiftHotelGrid(cityId) {
+  shiftHotelCityId = cityId || activeCityId;
+  // city tabs (only if >1 city)
+  const tabsEl = document.getElementById('hotelCityTabs');
+  const cityKeys = Object.keys(appData.cities);
+  if (cityKeys.length > 1) {
+    tabsEl.style.display = 'flex';
+    tabsEl.innerHTML = '';
+    cityKeys.forEach(id => {
+      const btn = document.createElement('button');
+      btn.className = 'hcity-tab' + (id === shiftHotelCityId ? ' active' : '');
+      btn.textContent = appData.cities[id].name;
+      btn.onclick = () => renderShiftHotelGrid(id);
+      tabsEl.appendChild(btn);
+    });
+  } else {
+    tabsEl.style.display = 'none';
+  }
+  // hotel grid for selected city
+  const grid = document.getElementById('hGrid'); grid.innerHTML = '';
+  const cityHotels = appData.cities[shiftHotelCityId]?.hotels || {};
+  Object.entries(cityHotels).forEach(([name,{bg,fg}]) => {
+    const b = document.createElement('button');
+    b.className = 'hbtn' + (ms.hotel===name ? ' sel' : '');
+    b.style.background = bg; b.style.color = fg; b.textContent = name;
+    b.onclick = () => { ms.hotel = name; ms.status = null; refreshShift(); };
+    grid.appendChild(b);
+  });
+}
+
+function openShift(emp, day) {
+  document.querySelector('#shiftOv .btn-clr').style.display = '';
+  const e = entry(emp,day) || {};
+  const saved = getCustomSaved(e.customLabel);
+  const savedColor   = e.customColor   ?? saved?.color   ?? '#6366f1';
+  const savedOpacity = e.customOpacity ?? saved?.opacity ?? 1;
+  ms = {emp, day, hotel:e.hotel||null, shift:e.shift||'Night', status:e.status||null,
+        customLabel:e.customLabel||'', customColor:savedColor, customOpacity:savedOpacity,
+        customTime:e.customTime||'', customHours:e.hours||0, _multi:false};
+  document.getElementById('shiftTitle').textContent = `${employeeName(emp)}  —  ${day}. ${MONTHS[curMonth]}`;
+  applyFocus([emp], [day]);
+  renderShiftHotelGrid(activeCityId);
+  document.getElementById('mHrs').value = e.hotel ? (e.hours || 8) : '';
+  document.getElementById('customLabelInput').value = e.customLabel || '';
+  document.getElementById('customColorInput').value = savedColor;
+  document.getElementById('customColSwatch').style.background = savedColor;
+  document.getElementById('customTimeInput').value = e.customTime || '';
+  document.getElementById('customHrsInput').value = (e.status==='Custom' && e.hours) ? e.hours : '';
+  document.getElementById('statusHrsInput').value  = ((e.status==='Urlaub'||e.status==='Krank') && e.hours) ? e.hours : '';
+  setOpacityUI(savedOpacity);
+  refreshShift();
+  document.getElementById('shiftOv').classList.add('open');
+}
+
+function refreshShift(){
+  document.querySelectorAll('.hbtn').forEach(b=>b.classList.toggle('sel',b.textContent===ms.hotel));
+  document.getElementById('sNight').classList.toggle('sel',ms.shift==='Night');
+  document.getElementById('sLate').classList.toggle('sel', ms.shift==='Late');
+  document.getElementById('stOff').className    ='stbtn'+(ms.status==='Off'?    ' sel-off':'');
+  document.getElementById('stUrl').className    ='stbtn'+(ms.status==='Urlaub'? ' sel-url':'');
+  document.getElementById('stKrank').className  ='stbtn'+(ms.status==='Krank'?  ' sel-krank':'');
+  document.getElementById('stCustom').className ='stbtn'+(ms.status==='Custom'? ' sel-custom':'');
+  document.getElementById('customLabelRow').style.display = ms.status==='Custom' ? 'block' : 'none';
+  document.getElementById('statusHrsRow').style.display   = (ms.status==='Urlaub'||ms.status==='Krank') ? 'block' : 'none';
+  document.getElementById('hotelSec').style.opacity=ms.status?'.35':'1';
+  document.getElementById('hotelSec').style.pointerEvents=ms.status?'none':'all';
+}
+function pickSt(s){ ms.status=(ms.status===s?null:s); if(ms.status)ms.hotel=null; refreshShift(); }
+function onCustomLabelInput(val){
+  ms.customLabel = val;
+  // auto-suggest saved color + opacity when label matches a known one
+  const saved = getCustomSaved(val);
+  if (saved) {
+    ms.customColor = saved.color;
+    ms.customOpacity = saved.opacity;
+    document.getElementById('customColorInput').value = saved.color;
+    document.getElementById('customColSwatch').style.background = saved.color;
+    setOpacityUI(saved.opacity);
+  }
+}
+function pickSh(s){ ms.shift=s; ms.status=null; refreshShift(); }
+function saveShift(){
+  if(!ms.status&&!ms.hotel){ alert('Bitte Hotel oder Status wählen'); return; }
+  if(ms.status==='Custom'&&!(ms.customLabel||'').trim()){ alert('Bitte Label eingeben'); return; }
+  saveSnapshot();
+  const val = ms.status
+    ? (ms.status==='Custom'
+        ? { status:'Custom',
+            customLabel:(ms.customLabel||'').trim(),
+            customColor:ms.customColor||'#6366f1',
+            customOpacity:ms.customOpacity??1,
+            customTime:(ms.customTime||'').trim(),
+            hours:parseFloat(document.getElementById('customHrsInput').value)||0 }
+        : (ms.status==='Urlaub'||ms.status==='Krank')
+            ? {status:ms.status, hours:parseFloat(document.getElementById('statusHrsInput').value)||0}
+            : {status:ms.status})
+    : {hotel:ms.hotel, shift:ms.shift, hours:parseFloat(document.getElementById('mHrs').value)||8};
+  // remember custom color for this label
+  if (ms.status==='Custom' && val.customLabel) {
+    if (!appData.customColors) appData.customColors = {};
+    appData.customColors[val.customLabel] = {color: val.customColor, opacity: val.customOpacity};
+  }
+  if (ms._multi) {
+    selectedCells.forEach(k => {
+      const sep = k.lastIndexOf('|||');
+      const emp = k.slice(0, sep);
+      const day = parseInt(k.slice(sep + 3));
+      setEntry(emp, day, {...val});
+    });
+    deselectAll();
+  } else {
+    setEntry(ms.emp, ms.day, val);
+  }
+  closeModal('shiftOv'); render();
+}
+function clearCell(){
+  saveSnapshot();
+  setEntry(ms.emp, ms.day, null);
+  closeModal('shiftOv'); render();
+}
+
+// ══ EMPLOYEE ════════════════════════════════════════════════════════════════
+function openAddEmp(){ document.getElementById('empOv').classList.add('open'); document.getElementById('newEmpNm').value=''; setTimeout(()=>document.getElementById('newEmpNm').focus(),50); }
+function saveEmp(){
+  const n=document.getElementById('newEmpNm').value.trim(); if(!n)return;
+  saveSnapshot(); employees().push({id:newEmpId(), name:n}); persist(); closeModal('empOv'); render();
+}
+function removeEmp(idx){
+  const empObj = employees()[idx];
+  appConfirm(`"${empObj.name}" wirklich löschen?`, ()=>{
+    saveSnapshot();
+    // clean all schedule entries keyed by this stable ID
+    const sched = city().schedule;
+    if (sched) Object.values(sched).forEach(yr => Object.values(yr).forEach(mo => delete mo[empObj.id]));
+    employees().splice(idx, 1);
+    persist(); render();
+  });
+}
+function startRenameEmp(empId, spanEl){
+  if(spanEl.tagName==='INPUT') return;
+  const empObj = employees().find(e => e.id === empId);
+  if (!empObj) return;
+  const oldName = empObj.name;
+  const input = document.createElement('input');
+  input.type='text'; input.value=oldName; input.className='emp-name-input';
+  spanEl.replaceWith(input);
+  input.focus(); input.select();
+  let committed=false;
+  const commit = ()=>{
+    if(committed) return; committed=true;
+    const newName=input.value.trim();
+    if(newName && newName!==oldName) renameEmp(empId, newName);
+    else render();
+  };
+  input.addEventListener('blur', commit);
+  input.addEventListener('keydown', e=>{
+    if(e.key==='Enter'){ e.preventDefault(); input.blur(); }
+    if(e.key==='Escape'){ committed=true; render(); }
+  });
+}
+function renameEmp(empId, newName){
+  const emps = city().employees;
+  if(!emps) return;
+  const empObj = emps.find(e => e.id === empId);
+  if(!empObj) return;
+  if(emps.some(e => e.name === newName && e.id !== empId)){
+    alert(`"${newName}" existiert bereits`); render(); return;
+  }
+  saveSnapshot();
+  empObj.name = newName;
+  // No schedule key migration needed — schedule is keyed by stable ID
+  persist(); render();
+}
+
+// ══ CITY ════════════════════════════════════════════════════════════════════
+function openAddCity(){
+  _newCityRegion=null; _newCityTemplate=null;
+  document.getElementById('newCityNm').value='';
+  // reset region buttons
+  document.querySelectorAll('.region-btn').forEach(b=>b.classList.toggle('active', b.dataset.key==='null'));
+  // populate template select
+  const sel = document.getElementById('newCityTemplSel');
+  if (sel) {
+    sel.innerHTML='<option value="">— Leer starten —</option>';
+    Object.entries(appData.cities).forEach(([id,c])=>{
+      const opt=document.createElement('option'); opt.value=id;
+      opt.textContent=c.name+(c.employees?.length?` (${c.employees.length} MA)`:'');
+      sel.appendChild(opt);
+    });
+  }
+  document.getElementById('cityOv').classList.add('open');
+  setTimeout(()=>document.getElementById('newCityNm').focus(),50);
+}
+function setNewCityRegion(key){
+  _newCityRegion = key==='null'||key===null ? null : key;
+  document.querySelectorAll('.region-btn').forEach(b=>
+    b.classList.toggle('active', (b.dataset.key===String(key))||(b.dataset.key==='null'&&key===null)));
+}
+function saveCity(){
+  const n=document.getElementById('newCityNm').value.trim(); if(!n)return;
+  const id='c_'+Date.now();
+  // template: copy employees + hotels from source table (no schedule)
+  let baseHotels = JSON.parse(JSON.stringify(DEFAULT_HOTELS));
+  let baseEmployees = [];
+  if (_newCityTemplate && appData.cities[_newCityTemplate]) {
+    const tmpl = appData.cities[_newCityTemplate];
+    baseHotels    = JSON.parse(JSON.stringify(tmpl.hotels    || DEFAULT_HOTELS));
+    baseEmployees = (tmpl.employees || []).map(e => ({id: newEmpId(), name: e.name || e}));
+  }
+  appData.cities[id]={
+    name: n,
+    cityKey: _newCityRegion,
+    employees: baseEmployees,
+    schedule: {},
+    hotels: baseHotels
+  };
+  appData.activeCityId=id; activeCityId=id;
+  _newCityRegion=null; _newCityTemplate=null;
+  persist(); closeModal('cityOv'); render();
+}
+function switchCity(id){ activeCityId=id; appData.activeCityId=id; persist(); render(); updatePasteHint(); }
+function deleteCity(id){
+  const keys=Object.keys(appData.cities);
+  if(keys.length<=1){ alert('Mindestens eine Stadt muss vorhanden sein'); return; }
+  appConfirm(`Stadt "${appData.cities[id].name}" und alle Daten wirklich löschen?`, ()=>{
+    delete appData.cities[id];
+    if(activeCityId===id){ activeCityId=Object.keys(appData.cities)[0]; appData.activeCityId=activeCityId; }
+    persist(); render();
+  }, {icon:'🏙'});
+}
+
+// ══ HOTELS ══════════════════════════════════════════════════════════════════
+let hotelMgrCityId = null;
+
+function openHotelMgr(){
+  hotelMgrCityId = activeCityId;
+  renderHMgrTabs();
+  renderHList();
+  document.getElementById('hotelOv').classList.add('open');
+}
+function renderHMgrTabs(){
+  const bar = document.getElementById('hmgrTabs');
+  bar.innerHTML = '';
+  Object.entries(appData.cities).forEach(([id,c])=>{
+    const btn = document.createElement('button');
+    btn.className = 'hmgr-tab' + (id===hotelMgrCityId?' active':'');
+    btn.textContent = c.name;
+    btn.onclick = ()=>{ hotelMgrCityId=id; renderHMgrTabs(); renderHList(); };
+    bar.appendChild(btn);
+  });
+}
+function renderHList(){
+  const list=document.getElementById('hList'); list.innerHTML='';
+  const cityHotels = appData.cities[hotelMgrCityId]?.hotels || {};
+  Object.entries(cityHotels).forEach(([name,{bg}])=>{
+    const safeN = name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    const row=document.createElement('div'); row.className='h-row';
+    row.innerHTML=`
+      <div class="h-clr-wrap" title="Farbe ändern">
+        <div class="h-clr-swatch" style="background:${bg}"></div>
+        <input type="color" value="${bg}" oninput="updateHotelColor('${safeN}',this.value,this.previousElementSibling)">
+      </div>
+      <span class="h-rname" ondblclick="startRenameHotel('${safeN}',this)">${name}</span>
+      <button class="h-edit" onclick="startRenameHotel('${safeN}',this.previousElementSibling)" title="Umbenennen"><i class="ti ti-pencil"></i></button>
+      <button class="h-del" onclick="delHotel('${safeN}')"><i class="ti ti-trash"></i></button>`;
+    list.appendChild(row);
+  });
+}
+function addHotel(){
+  const n=document.getElementById('newHNm').value.trim();
+  const bg=document.getElementById('newHCol').value;
+  if(!n){ alert('Bitte Name eingeben'); return; }
+  const cityHotels = appData.cities[hotelMgrCityId]?.hotels;
+  if(!cityHotels) return;
+  if(cityHotels[n]){ alert('Existiert bereits'); return; }
+  saveSnapshot(); cityHotels[n]={bg,fg:fgFor(bg)}; persist(); renderHList();
+  document.getElementById('newHNm').value='';
+  document.getElementById('newHCol').value='#5B9BD5';
+  document.getElementById('newHColSwatch').style.background='#5B9BD5';
+}
+function updateHotelColor(name, newBg, swatchEl){
+  const cityHotels = appData.cities[hotelMgrCityId]?.hotels;
+  if(!cityHotels || !cityHotels[name]) return;
+  swatchEl.style.background = newBg;
+  cityHotels[name].bg = newBg;
+  cityHotels[name].fg = fgFor(newBg);
+  persist();
+}
+function delHotel(name){
+  appConfirm(`Hotel "${name}" löschen?`, ()=>{
+    const cityHotels = appData.cities[hotelMgrCityId]?.hotels;
+    if(!cityHotels) return;
+    saveSnapshot(); delete cityHotels[name]; persist(); renderHList();
+  }, {icon:'🏨'});
+}
+function startRenameHotel(oldName, spanEl){
+  if(spanEl.tagName==='INPUT') return;
+  const input = document.createElement('input');
+  input.type='text'; input.value=oldName; input.className='h-rename-input';
+  spanEl.replaceWith(input);
+  input.focus(); input.select();
+  let committed=false;
+  const commit = ()=>{
+    if(committed) return; committed=true;
+    const newName=input.value.trim();
+    if(newName && newName!==oldName) renameHotel(oldName, newName);
+    else renderHList();
+  };
+  input.addEventListener('blur', commit);
+  input.addEventListener('keydown', e=>{
+    if(e.key==='Enter'){ e.preventDefault(); input.blur(); }
+    if(e.key==='Escape'){ committed=true; renderHList(); }
+  });
+}
+function renameHotel(oldName, newName){
+  const cityHotels = appData.cities[hotelMgrCityId]?.hotels;
+  if(!cityHotels || !cityHotels[oldName]) return;
+  if(cityHotels[newName]){ alert(`"${newName}" existiert bereits`); renderHList(); return; }
+  saveSnapshot();
+  cityHotels[newName] = cityHotels[oldName];
+  delete cityHotels[oldName];
+  // update all schedule entries in this city that reference the old hotel name
+  const cityData = appData.cities[hotelMgrCityId];
+  if(cityData?.schedule){
+    Object.values(cityData.schedule).forEach(yearData=>{
+      Object.values(yearData).forEach(monthData=>{
+        Object.values(monthData).forEach(empData=>{
+          Object.values(empData).forEach(e=>{
+            if(e?.hotel===oldName) e.hotel=newName;
+          });
+        });
+      });
+    });
+  }
+  persist(); renderHList(); render();
+}
+
+// ══ SETTINGS TABS ══════════════════════════════════════════════════════════
+function switchStab(idx){
+  [0,1,2,3].forEach(i=>{
+    const el=document.getElementById('stab'+i); if(el) el.style.display=i===idx?'block':'none';
+    const tabs=document.querySelectorAll('.stab'); if(tabs[i]) tabs[i].classList.toggle('active',i===idx);
+  });
+  if(idx===2) renderBackupList();
+  if(idx===1) renderTableSettings();
+}
+function renderTableSettings(){
+  const list=document.getElementById('tableSettingsList'); if(!list) return;
+  list.innerHTML='';
+  Object.entries(appData.cities).forEach(([id,c])=>{
+    const row=document.createElement('div');
+    row.style.cssText='display:flex;align-items:center;gap:6px;padding:8px 10px;background:var(--s3);border-radius:8px;border:1px solid var(--border2);';
+    const regionSel=document.createElement('select');
+    regionSel.style.cssText='flex:1;background:var(--s4);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 8px;font-size:11px;outline:none;font-family:inherit;cursor:pointer;';
+    CITY_REGIONS.forEach(r=>{
+      const o=document.createElement('option'); o.value=r.key===null?'':r.key; o.textContent=r.label;
+      if((c.cityKey??null)===(r.key??null)) o.selected=true;
+      regionSel.appendChild(o);
+    });
+    regionSel.onchange=()=>{
+      appData.cities[id].cityKey = regionSel.value||null;
+      persist(); render();
+    };
+    const nameSpan=document.createElement('span');
+    nameSpan.style.cssText='font-size:12px;font-weight:600;color:var(--text);min-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+    nameSpan.textContent=c.name;
+    row.appendChild(nameSpan);
+    row.appendChild(regionSel);
+    list.appendChild(row);
+  });
+}
+
+// ══ EXPORT / IMPORT ════════════════════════════════════════════════════════
+function exportJSON(){
+  // T6: calixo_version is the canonical version field; lk_version kept for import back-compat
+  const out={calixo_version:APP_VERSION, lk_version:APP_VERSION, exported_at:new Date().toISOString(), ...appData};
+  const blob=new Blob([JSON.stringify(out,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`Calixo_Backup_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+}
+
+function importJSON(input){
+  const file=input.files[0]; if(!file)return;
+  const reader=new FileReader();
+  reader.onload=async e=>{
+    try{
+      let data=JSON.parse(e.target.result);
+      // T6: guard — must have cities key (rejects unrelated JSON files silently)
+      if (!data || typeof data !== 'object' || !data.cities) {
+        console.warn('[Calixo] importJSON: invalid backup — missing cities key');
+        return;
+      }
+      data=migrate(data);  // handles v1→v8 forward-migration automatically
+      appData=data; activeCityId=appData.activeCityId||Object.keys(appData.cities)[0];
+      await persist(); render();
+    }catch(err){ console.warn('[Calixo] importJSON error:', err); }
+    input.value='';
+  };
+  reader.readAsText(file);
+}
+
+// ══ SMART EXPORT ═══════════════════════════════════════════════════════════
+let exState = {cities:'all', period:'current'};
+
+function openExportModal(){
+  exState = {cities:'all', period:'current'};
+  renderExCityBar();
+  document.querySelectorAll('.ex-period-btn').forEach(b=>b.classList.toggle('active', b.dataset.p==='current'));
+  document.getElementById('exRangeRow').style.display='none';
+  renderExPreview();
+  document.getElementById('exportOv').classList.add('open');
+}
+
+function renderExCityBar(){
+  const bar=document.getElementById('exCityBar'); bar.innerHTML='';
+  const allBtn=document.createElement('button');
+  allBtn.className='ex-city-btn'+(exState.cities==='all'?' active':'');
+  allBtn.textContent='Alle Städte';
+  allBtn.onclick=()=>{ exState.cities='all'; renderExCityBar(); renderExPreview(); };
+  bar.appendChild(allBtn);
+  Object.entries(appData.cities).forEach(([id,c])=>{
+    const btn=document.createElement('button');
+    const isActive=Array.isArray(exState.cities)&&exState.cities.includes(id);
+    btn.className='ex-city-btn'+(isActive?' active':'');
+    btn.textContent=c.name;
+    btn.onclick=()=>{
+      if(exState.cities==='all') exState.cities=[id];
+      else {
+        const arr=[...exState.cities];
+        const idx=arr.indexOf(id);
+        if(idx>=0){ const next=arr.filter(x=>x!==id); exState.cities=next.length?next:'all'; }
+        else arr.push(id), exState.cities=arr;
+      }
+      renderExCityBar(); renderExPreview();
+    };
+    bar.appendChild(btn);
+  });
+}
+
+function setExPeriod(p){
+  exState.period=p;
+  document.querySelectorAll('.ex-period-btn').forEach(b=>b.classList.toggle('active',b.dataset.p===p));
+  const row=document.getElementById('exRangeRow');
+  row.style.display=p==='range'?'flex':'none';
+  if(p==='range') populateMonthSelects();
+  renderExPreview();
+}
+
+function populateMonthSelects(){
+  const opts=[];
+  for(let y=curYear-2;y<=curYear+2;y++){
+    for(let m=0;m<12;m++){
+      const val=`${y}-${String(m+1).padStart(2,'0')}`;
+      opts.push(`<option value="${val}">${MONTHS[m]} ${y}</option>`);
+    }
+  }
+  const html=opts.join('');
+  const fromSel=document.getElementById('exFrom');
+  const toSel=document.getElementById('exTo');
+  if(!fromSel.innerHTML) fromSel.innerHTML=html;
+  if(!toSel.innerHTML)   toSel.innerHTML=html;
+  const cur=`${curYear}-${String(curMonth+1).padStart(2,'0')}`;
+  if(!fromSel.value||fromSel.value===cur) fromSel.value=cur;
+  if(!toSel.value||toSel.value===cur)     toSel.value=cur;
+}
+
+function getExportMonths(){
+  if(exState.period==='all') return null;
+  if(exState.period==='current') return [{y:curYear,m:curMonth}];
+  const from=document.getElementById('exFrom')?.value;
+  const to=document.getElementById('exTo')?.value;
+  if(!from||!to) return [];
+  const [fy,fm]=from.split('-').map(Number);
+  const [ty,tm]=to.split('-').map(Number);
+  // fm/tm from select are 1-indexed; schedule keys are 0-indexed like curMonth
+  const fmIdx=fm-1, tmIdx=tm-1;
+  const months=[]; let y=fy,m=fmIdx;
+  while(y<ty||(y===ty&&m<=tmIdx)){
+    months.push({y,m}); m++;
+    if(m>11){m=0;y++;}
+    if(months.length>120) break;
+  }
+  return months;
+}
+
+function renderExPreview(){
+  const box=document.getElementById('exPreview'); if(!box) return;
+  const cityIds=exState.cities==='all'?Object.keys(appData.cities):exState.cities;
+  const months=getExportMonths();
+
+  let periodLabel='';
+  if(exState.period==='current') periodLabel=`${MONTHS[curMonth]} ${curYear}`;
+  else if(exState.period==='all') periodLabel='Alle Monate';
+  else{
+    const from=document.getElementById('exFrom')?.value;
+    const to=document.getElementById('exTo')?.value;
+    if(from&&to){
+      const [fy,fm]=from.split('-').map(Number);
+      const [ty,tm]=to.split('-').map(Number);
+      periodLabel=from===to?`${MONTHS[fm-1]} ${fy}`:`${MONTHS[fm-1]} ${fy} – ${MONTHS[tm-1]} ${ty}`;
+    }
+  }
+
+  let totalEntries=0;
+  const cityLines=cityIds.map(id=>{
+    const c=appData.cities[id]; if(!c) return '';
+    let count=0;
+    const sched=c.schedule||{};
+    if(months===null){
+      Object.values(sched).forEach(yd=>Object.values(yd).forEach(md=>Object.values(md).forEach(ed=>count+=Object.keys(ed).length)));
+    } else {
+      months.forEach(({y,m})=>{ const md=sched[y]?.[m]; if(md) Object.values(md).forEach(ed=>count+=Object.keys(ed).length); });
+    }
+    totalEntries+=count;
+    return `<div class="ex-preview-row">
+      <div class="ex-preview-dot"></div>
+      <span style="font-size:12px;color:var(--text);font-weight:500;">${c.name}</span>
+      <span style="font-size:11px;color:var(--muted);margin-left:4px;">· ${(c.employees||[]).length} MA · ${count} Einträge</span>
+    </div>`;
+  }).join('');
+
+  box.innerHTML=`<div class="ex-preview-lbl">Vorschau</div>${cityLines}
+    <div style="margin-top:9px;padding-top:9px;border-top:1px solid var(--border2);font-size:11px;color:var(--muted);">
+      📅 ${periodLabel}${months&&months.length>1?` · ${months.length} Monate`:''}
+    </div>`;
+}
+
+function doSmartExport(){
+  const cityIds=exState.cities==='all'?Object.keys(appData.cities):exState.cities;
+  const months=getExportMonths();
+  const out={
+    lk_version:APP_VERSION,
+    exported_at:new Date().toISOString(),
+    export_meta:{type:months===null?'full':exState.period, cities:exState.cities},
+    activeCityId:appData.activeCityId,
+    holidaySettings:appData.holidaySettings,
+    cities:{}
+  };
+  cityIds.forEach(id=>{
+    const c=appData.cities[id]; if(!c) return;
+    out.cities[id]={name:c.name, employees:[...c.employees||[]], hotels:{...c.hotels||{}}, schedule:{}};
+    if(months===null){
+      out.cities[id].schedule=c.schedule||{};
+    } else {
+      months.forEach(({y,m})=>{
+        const md=c.schedule?.[y]?.[m];
+        if(md){ if(!out.cities[id].schedule[y]) out.cities[id].schedule[y]={}; out.cities[id].schedule[y][m]=md; }
+      });
+    }
+  });
+  const dateStr=new Date().toISOString().slice(0,10);
+  const names=cityIds.map(id=>appData.cities[id]?.name||id).join('-');
+  const blob=new Blob([JSON.stringify(out,null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download=`LK_Export_${names}_${dateStr}.json`; a.click();
+  closeModal('exportOv');
+}
+
+// ══ SMART IMPORT ════════════════════════════════════════════════════════════
+let _importData=null, _importMode='merge';
+
+function handleImportFile(input){
+  const file=input.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const data=JSON.parse(e.target.result);
+      _importData=migrate(data);
+      openImportPreview(file.name);
+    }catch(err){
+      document.getElementById('importMsg').textContent='⚠ Fehler: Ungültige Datei';
+      document.getElementById('importMsg').style.color='var(--sick-fg)';
+    }
+    input.value='';
+  };
+  reader.readAsText(file);
+}
+
+function openImportPreview(fileName){
+  _importMode='merge';
+  document.getElementById('importFileName').textContent=fileName;
+  const box=document.getElementById('importFileInfo'); box.innerHTML='';
+  Object.entries(_importData.cities||{}).forEach(([id,c])=>{
+    const months=[];
+    Object.entries(c.schedule||{}).forEach(([y,yd])=>Object.keys(yd).forEach(m=>months.push({y:parseInt(y),m:parseInt(m)})));
+    months.sort((a,b)=>a.y!==b.y?a.y-b.y:a.m-b.m);
+    let periodStr='Keine Einträge';
+    if(months.length===1) periodStr=`${MONTHS[months[0].m-1]} ${months[0].y}`;
+    else if(months.length>1){
+      const f=months[0],l=months[months.length-1];
+      periodStr=`${MONTHS[f.m-1]} ${f.y} – ${MONTHS[l.m-1]} ${l.y} · ${months.length} Monate`;
+    }
+    const row=document.createElement('div'); row.className='import-info-row';
+    row.innerHTML=`<span style="font-size:18px;line-height:1;">🏙</span>
+      <div>
+        <div style="font-size:12px;font-weight:600;color:var(--text);">${c.name||id}</div>
+        <div style="font-size:11px;color:var(--dim);margin-top:2px;">${periodStr} · ${(c.employees||[]).length} Mitarbeiter</div>
+      </div>`;
+    box.appendChild(row);
+  });
+  setImportMode('merge');
+  document.getElementById('importPreviewOv').classList.add('open');
+}
+
+function setImportMode(mode){
+  _importMode=mode;
+  document.getElementById('modeCardMerge').classList.toggle('active',mode==='merge');
+  document.getElementById('modeCardReplace').classList.toggle('active',mode==='replace');
+}
+
+async function doImport(){
+  if(!_importData) return;
+  saveSnapshot();
+  if(_importMode==='replace'){
+    appData=_importData;
+    activeCityId=appData.activeCityId||Object.keys(appData.cities)[0];
+  } else {
+    // Merge: imported months overwrite existing, everything else preserved
+    if(_importData.holidaySettings) Object.assign(appData.holidaySettings||{}, _importData.holidaySettings);
+    Object.entries(_importData.cities||{}).forEach(([cityId,imp])=>{
+      if(!appData.cities[cityId]){
+        appData.cities[cityId]=imp; return;
+      }
+      const ex=appData.cities[cityId];
+      // employees: add new at end, keep existing order — dedup by stable ID
+      (imp.employees||[]).forEach(impEmp=>{
+        const em = typeof impEmp === 'string' ? {id: newEmpId(), name: impEmp} : impEmp;
+        if (!ex.employees.some(e => e.id === em.id)) ex.employees.push(em);
+      });
+      // hotels: merge
+      Object.assign(ex.hotels, imp.hotels||{});
+      // schedule: imported months overwrite; stamp missing updatedAt so LWW works (Fix 7)
+      Object.entries(imp.schedule||{}).forEach(([y,yd])=>{
+        if(!ex.schedule[y]) ex.schedule[y]={};
+        Object.entries(yd).forEach(([m,md])=>{
+          // Ensure every entry in the imported month has a timestamp.
+          // Entries from old backups (pre-v6) may lack updatedAt entirely.
+          const now = Date.now();
+          Object.values(md || {}).forEach(empSched => {
+            Object.values(empSched || {}).forEach(e => {
+              if (e && typeof e === 'object' && !e.updatedAt) e.updatedAt = now;
+            });
+          });
+          ex.schedule[y][m] = md;
+        });
+      });
+    });
+  }
+  await persist(); render();
+  closeModal('importPreviewOv');
+  closeModal('settingsOv');
+  _importData=null;
+}
+
+// ══ BACKUP ════════════════════════════════════════════════════════════════
+async function createBackup(){
+  let bks=JSON.parse(localStorage.getItem('lk3_bk')||'[]');
+  // encrypt backup with same key
+  const blob=await encrypt({...appData},cryptoKey);
+  bks.unshift({ts:new Date().toISOString(),blob});
+  if(bks.length>5)bks=bks.slice(0,5);
+  localStorage.setItem('lk3_bk',JSON.stringify(bks));
+  renderBackupList();
+}
+async function restoreBackup(idx){
+  appConfirm('Aktuellen Datenstand durch Backup ersetzen?', async ()=>{
+    const bks=JSON.parse(localStorage.getItem('lk3_bk')||'[]');
+    try{
+      const data=await decrypt(bks[idx].blob,cryptoKey);
+      appData=migrate(data); activeCityId=appData.activeCityId||Object.keys(appData.cities)[0];
+      await persist(); render(); closeModal('settingsOv');
+    }catch(e){ alert('Backup konnte nicht geladen werden'); }
+  }, {icon:'💾', label:'Wiederherstellen', color:'#5B9BD5'});
+}
+function renderBackupList(){
+  const list=document.getElementById('bkList');
+  const bks=JSON.parse(localStorage.getItem('lk3_bk')||'[]');
+  if(!bks.length){ list.innerHTML='<div style="font-size:11px;color:var(--dim);padding:8px;">Keine Backups vorhanden.</div>'; return; }
+  list.innerHTML='';
+  bks.forEach((bk,i)=>{
+    const d=new Date(bk.ts);
+    const row=document.createElement('div'); row.className='bk-row';
+    row.innerHTML=`<span class="bk-name">Backup ${i+1}</span>
+      <span class="bk-date">${d.toLocaleDateString('de-DE')} ${d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})}</span>
+      <button class="btn btn-ghost" style="font-size:10px;padding:3px 8px;margin-left:auto;" onclick="restoreBackup(${i})">Laden</button>
+      <button class="h-del" onclick="deleteBackup(${i})" title="Backup löschen"><i class="ti ti-trash"></i></button>`;
+    list.appendChild(row);
+  });
+}
+
+function deleteBackup(idx){
+  appConfirm(`Backup ${idx+1} wirklich löschen?`, ()=>{
+    const bks=JSON.parse(localStorage.getItem('lk3_bk')||'[]');
+    bks.splice(idx,1);
+    localStorage.setItem('lk3_bk',JSON.stringify(bks));
+    renderBackupList();
+  }, {icon:'💾'});
+}
+
+// changePassword() removed — auth handled by Supabase
+
+// ══ SETTINGS MODAL ═════════════════════════════════════════════════════════
+function openSettings(){ switchStab(0); document.getElementById('settingsOv').classList.add('open'); }
+
+// ══ ZOOM ═══════════════════════════════════════════════════════════════════
+function setZoom(z){
+  zoomLevel=Math.max(30,Math.min(130,Math.round(z)));
+  document.documentElement.style.setProperty('--zoom',(zoomLevel/100).toString());
+  document.getElementById('zLabel').textContent=zoomLevel+'%';
+  document.getElementById('zSlider').value=zoomLevel;
+}
+function zoomIn() { setZoom(zoomLevel+10); }
+function zoomOut(){ setZoom(zoomLevel-10); }
+function fitScreen(){
+  const days=daysInMonth(curYear,curMonth);
+  const tw=172+days*77+62+4; // base table width at zoom=1
+  // use app width (not tbl-outer, which now shrinks to content) minus main's padding
+  const aw=document.getElementById('app').clientWidth-24;
+  setZoom(Math.floor(Math.min(1,aw/tw)*100));
+}
+
+// ══ SCREENSHOT ═════════════════════════════════════════════════════════════
+async function takeScreenshot(){
+  const btn=document.getElementById('ssBtn'), hint=document.getElementById('ssHint');
+  if(typeof html2canvas==='undefined'){ hint.textContent='⚠ Kein Internet'; hint.style.color='var(--sick-fg)'; return; }
+  btn.innerHTML='<i class="ti ti-loader-2 ti-spin"></i> Erstelle...'; btn.style.pointerEvents='none'; hint.textContent='';
+
+  const sz=zoomLevel;
+  document.documentElement.style.setProperty('--zoom','1');
+
+  // html2canvas doesn't handle position:sticky — temporarily disable it
+  const stickyEls=document.querySelectorAll('#tbl .th-name,#tbl .th-tot,#tbl .td-name,#tbl .td-tot');
+  const origPos=[];
+  stickyEls.forEach(el=>{ origPos.push(el.style.position); el.style.position='relative'; });
+
+  // scroll to start
+  const mainEl=document.querySelector('.tbl-outer');
+  const origScroll=mainEl.scrollLeft;
+  mainEl.scrollLeft=0;
+
+  await new Promise(r=>setTimeout(r,120));
+  try{
+    const tbl=document.getElementById('tbl');
+
+    // Theme-aware colors
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+    const C = isLight
+      ? {bg:'#f0f2f5', hdr:'#ffffff', sep:'#c8cbd0', logo:'#030303', sub:'#6b778c', month:'#030303'}
+      : {bg:'#030303', hdr:'#0c0c0c', sep:'#2a2a2a', logo:'#ffffff', sub:'#7a7a7a', month:'#ffffff'};
+
+    // Capture table first
+    const cTbl=await html2canvas(tbl,{backgroundColor:C.bg,scale:2,logging:false,
+      scrollX:0,scrollY:0,width:tbl.scrollWidth,height:tbl.scrollHeight,
+      windowWidth:tbl.scrollWidth,windowHeight:tbl.scrollHeight,useCORS:true});
+
+    // Draw header directly on canvas (avoids black-block artefact from topbar capture)
+    const SC=2, HDR=56*SC;
+    const combined=document.createElement('canvas');
+    combined.width=cTbl.width;
+    combined.height=HDR+cTbl.height;
+    const ctx=combined.getContext('2d');
+
+    // header background
+    ctx.fillStyle=C.hdr;
+    ctx.fillRect(0,0,combined.width,HDR);
+    // separator line
+    ctx.fillStyle=C.sep;
+    ctx.fillRect(0,HDR-SC,combined.width,SC);
+    // logo "L&K"
+    ctx.font=`bold ${28*SC}px "Segoe UI",Arial,sans-serif`;
+    ctx.fillStyle=C.logo;
+    ctx.textBaseline='middle';
+    ctx.fillText('L&K',28*SC,HDR/2);
+    const lkW=ctx.measureText('L&K').width;
+    // " Dienstplanung"
+    ctx.font=`${22*SC}px "Segoe UI",Arial,sans-serif`;
+    ctx.fillStyle=C.sub;
+    ctx.fillText(' Dienstplanung',28*SC+lkW,HDR/2);
+    // month label centered
+    const monthTxt=`${MONTHS[curMonth]} ${curYear}`;
+    ctx.font=`bold ${26*SC}px "Segoe UI",Arial,sans-serif`;
+    ctx.fillStyle=C.month;
+    const mW=ctx.measureText(monthTxt).width;
+    ctx.fillText(monthTxt,(combined.width-mW)/2,HDR/2);
+    // table
+    ctx.fillStyle=C.bg;
+    ctx.fillRect(0,HDR,combined.width,cTbl.height);
+    ctx.drawImage(cTbl,0,HDR);
+
+    const a=document.createElement('a');
+    a.download=`LK_${city().name}_${MONTHS[curMonth]}_${curYear}.png`;
+    a.href=combined.toDataURL('image/png'); a.click();
+    hint.textContent='✓ Gespeichert'; hint.style.color='#22c55e';
+    setTimeout(()=>{ hint.textContent=''; },3000);
+  }catch(e){ hint.textContent='⚠ Fehler: '+e.message; hint.style.color='var(--sick-fg)'; }
+  finally{
+    stickyEls.forEach((el,i)=>{ el.style.position=origPos[i]; });
+    mainEl.scrollLeft=origScroll;
+    document.documentElement.style.setProperty('--zoom',(sz/100).toString());
+    btn.innerHTML='<i class="ti ti-camera"></i> Screenshot'; btn.style.pointerEvents='auto';
+  }
+}
+
+// ══ ROW / COLUMN FOCUS ═════════════════════════════════════════════════════
+function clearFocus() {
+  document.querySelectorAll('.col-focus').forEach(el => el.classList.remove('col-focus'));
+  document.querySelectorAll('.row-focus').forEach(el => el.classList.remove('row-focus'));
+}
+
+function applyFocus(empList, dayList) {
+  clearFocus();
+  // highlight day headers (th-day cells in order = day 1,2,3…)
+  const ths = document.querySelectorAll('#tbl thead .th-day');
+  dayList.forEach(d => { if (ths[d - 1]) ths[d - 1].classList.add('col-focus'); });
+  // highlight name cells (only real rows, not sum row — use data-idx attr)
+  const nameCells = document.querySelectorAll('#tbl .td-name[data-idx]');
+  const empArr = employees();
+  empList.forEach(emp => {
+    const idx = empArr.findIndex(e => e.id === emp);
+    if (idx >= 0 && nameCells[idx]) nameCells[idx].classList.add('row-focus');
+  });
+}
+
+function updateFocusFromSelection() {
+  if (!selectedCells.size) { clearFocus(); return; }
+  const days = new Set();
+  const emps = new Set();
+  selectedCells.forEach(k => {
+    const sep = k.lastIndexOf('|||');
+    emps.add(k.slice(0, sep));
+    days.add(parseInt(k.slice(sep + 3)));
+  });
+  applyFocus([...emps], [...days]);
+}
+
+// ══ HOLIDAY MANAGER ════════════════════════════════════════════════════════
+let hmTabIdx = 0;
+
+function openHolidayMgr() {
+  switchHMTab(0);
+  document.getElementById('holidayOv').classList.add('open');
+}
+
+function switchHMTab(idx) {
+  hmTabIdx = idx;
+  document.getElementById('hmTab0').style.display = idx===0?'block':'none';
+  document.getElementById('hmTab1').style.display = idx===1?'block':'none';
+  document.querySelectorAll('.hm-tab').forEach((t,i)=>t.classList.toggle('active',i===idx));
+  if (idx===0) renderHMTab0(); else renderHMTab1();
+}
+
+function renderHMTab0() {
+  const hs = getHolidaySettings();
+  const cityKey = getCityKey(city());
+  const hasCityHolidays = BUILT_IN_HOLIDAYS.some(h=>h.layer==='city'&&h.cityKey===cityKey);
+
+  // Filter bar
+  const fb = document.getElementById('hmFilterBar'); fb.innerHTML='';
+  const filters = [
+    {label:'🌍 Global',           key:'global'},
+    {label:'🇩🇪 Deutschland',     key:'de'},
+    {label:'🏙 '+city().name,      key:'city'},
+  ];
+  filters.forEach(f => {
+    if (f.key==='city' && !hasCityHolidays) return; // skip if no city holidays
+    const btn = document.createElement('button');
+    btn.className = 'hm-fbtn' + (hs.layers.includes(f.key)?' active':'');
+    btn.textContent = f.label;
+    btn.onclick = () => {
+      if (hs.layers.includes(f.key)) hs.layers = hs.layers.filter(l=>l!==f.key);
+      else hs.layers.push(f.key);
+      persist(); renderHMTab0(); render();
+    };
+    fb.appendChild(btn);
+  });
+
+  // Holiday list grouped by layer
+  const list = document.getElementById('hmHdayList'); list.innerHTML='';
+  const layerLabels = {global:'🌍 Global', de:'🇩🇪 Deutschland', city:'🏙 '+city().name};
+  let curLayer = null;
+  let anyVisible = false;
+
+  BUILT_IN_HOLIDAYS.forEach(h => {
+    if (h.layer==='city' && h.cityKey !== cityKey) return; // skip other city's holidays
+    if (!hs.layers.includes(h.layer)) return; // skip inactive layers
+
+    anyVisible = true;
+    // Layer header
+    if (h.layer !== curLayer) {
+      curLayer = h.layer;
+      const hdr = document.createElement('div');
+      hdr.className = 'hm-hday-lhdr';
+      hdr.textContent = layerLabels[h.layer]||h.layer;
+      list.appendChild(hdr);
+    }
+
+    const color = hs.colorOverrides[h.id] || h.defaultColor;
+    const isDisabled = hs.disabled.includes(h.id);
+    const row = document.createElement('div');
+    row.className = 'hm-hday-row' + (isDisabled ? ' hday-disabled' : '');
+
+    // date label
+    let dateLbl = '';
+    if (h.type==='easter') {
+      const easter = easterDate(curYear);
+      const e0 = new Date(curYear, easter.month-1, easter.day);
+      const dt = new Date(e0.getTime()+h.offset*86400000);
+      dateLbl = `${dt.getDate()}.${dt.getMonth()+1}.`;
+    } else {
+      dateLbl = `${h.day}.${h.month}.`;
+    }
+
+    row.innerHTML = `
+      <div class="h-clr-wrap" title="Farbe ändern">
+        <div class="h-clr-swatch hday-swatch-ref" style="background:${color}"></div>
+        <input type="color" value="${color}" data-hid="${h.id}">
+      </div>
+      <span class="hm-hday-name">${h.name}</span>
+      <span class="hm-hday-date">${dateLbl}</span>
+      <button class="hday-toggle ${isDisabled?'t-off':'t-on'}" data-hid="${h.id}">${isDisabled?'EIN':'AUS'}</button>
+    `;
+
+    row.querySelector('input[type=color]').oninput = function() {
+      hs.colorOverrides[this.dataset.hid] = this.value;
+      this.closest('.hm-hday-row').querySelector('.hday-swatch-ref').style.background = this.value;
+      persist(); render();
+    };
+    row.querySelector('.hday-toggle').onclick = function() {
+      const hid = this.dataset.hid;
+      if (hs.disabled.includes(hid)) hs.disabled = hs.disabled.filter(x=>x!==hid);
+      else hs.disabled.push(hid);
+      persist(); renderHMTab0(); render();
+    };
+    list.appendChild(row);
+  });
+
+  if (!anyVisible) {
+    list.innerHTML='<div style="font-size:11px;color:var(--dim);padding:10px 6px;">Keine Ebene aktiv — bitte oben aktivieren.</div>';
+  }
+}
+
+function renderHMTab1() {
+  const hs = getHolidaySettings();
+  const list = document.getElementById('evList'); list.innerHTML='';
+  if (!hs.events.length) {
+    list.innerHTML='<div style="font-size:11px;color:var(--dim);padding:8px;">Keine eigenen Events.</div>';
+    return;
+  }
+  hs.events.forEach((ev,i) => {
+    const row = document.createElement('div'); row.className='ev-row';
+    const dateStr = ev.dateTo && ev.dateTo!==ev.date
+      ? `${ev.date} – ${ev.dateTo}` : ev.date;
+    const evColor = ev.color||'#10b981';
+    row.innerHTML=`
+      <div class="h-clr-wrap" title="Farbe ändern">
+        <div class="h-clr-swatch ev-swatch-ref" style="background:${evColor}"></div>
+        <input type="color" value="${evColor}" data-idx="${i}">
+      </div>
+      <span class="ev-name"></span>
+      <span class="ev-date"></span>
+      <button class="ev-del" title="Löschen"><i class="ti ti-trash"></i></button>`;
+    row.querySelector('.ev-name').textContent = ev.name;
+    row.querySelector('.ev-date').textContent = dateStr;
+    row.querySelector('input[type=color]').oninput = function(){
+      const idx = parseInt(this.dataset.idx);
+      hs.events[idx].color = this.value;
+      this.closest('.ev-row').querySelector('.ev-swatch-ref').style.background = this.value;
+      persist(); render();
+    };
+    row.querySelector('.ev-del').onclick = () => deleteEvent(i);
+    list.appendChild(row);
+  });
+}
+
+function addEvent() {
+  const name  = document.getElementById('newEvName').value.trim();
+  const date  = document.getElementById('newEvDate').value;
+  const dateTo= document.getElementById('newEvDateTo').value;
+  const color = document.getElementById('newEvColor').value;
+  if (!name || !date) { alert('Name und Datum eingeben'); return; }
+  const hs = getHolidaySettings();
+  hs.events.push({id:'ev_'+Date.now(), name, date, dateTo:dateTo||null, color, cityKey:null});
+  persist(); renderHMTab1(); render();
+  document.getElementById('newEvName').value='';
+  document.getElementById('newEvDate').value='';
+  document.getElementById('newEvDateTo').value='';
+}
+
+function deleteEvent(idx) {
+  const hs = getHolidaySettings();
+  appConfirm(`"${hs.events[idx].name}" löschen?`, ()=>{
+    hs.events.splice(idx,1);
+    persist(); renderHMTab1(); render();
+  }, {icon:'📅'});
+}
+
+// ══ MULTI-SELECT ═══════════════════════════════════════════════════════════
+function toggleCellSel(emp, day, tdEl) {
+  const k = emp + '|||' + day;
+  if (selectedCells.has(k)) {
+    selectedCells.delete(k);
+    if (tdEl) tdEl.classList.remove('sel-cell');
+    refreshSelBorders();
+    if (selectedCells.size === 0 && selMode) { toggleSelMode(); return; }
+  } else {
+    selectedCells.add(k);
+    if (tdEl) tdEl.classList.add('sel-cell');
+    refreshSelBorders();
+  }
+  updateSelBar();
+}
+function updateSelBar() {
+  const bar = document.getElementById('selBar');
+  const n = selectedCells.size;
+  if (n === 0) { bar.classList.add('hidden'); clearFocus(); updatePasteHint(); }
+  else {
+    bar.classList.remove('hidden');
+    document.getElementById('selCount').textContent = n + (n===1 ? ' Zelle ausgewählt' : ' Zellen ausgewählt');
+    updateFocusFromSelection();
+    // show Swap button only when exactly 2 employees selected
+    const empSet = new Set([...selectedCells].map(k=>k.slice(0,k.lastIndexOf('|||'))));
+    const swapBtn = document.getElementById('swapBtn');
+    if (swapBtn) swapBtn.style.display = empSet.size===2 ? 'inline-flex' : 'none';
+    updatePasteHint();
+  }
+  refreshSelBorders();
+}
+function refreshSelBorders() {
+  // Reset all sel-nl / sel-nr first
+  document.querySelectorAll('.sel-nl,.sel-nr').forEach(el => el.classList.remove('sel-nl','sel-nr'));
+  // Re-apply based on neighbors
+  selectedCells.forEach(k => {
+    const sep = k.lastIndexOf('|||');
+    const emp = k.slice(0, sep);
+    const d = parseInt(k.slice(sep + 3));
+    const el = document.querySelector(`[data-selkey="${CSS.escape(k)}"]`);
+    if (!el) return;
+    if (selectedCells.has(emp + '|||' + (d - 1))) el.classList.add('sel-nl');
+    if (selectedCells.has(emp + '|||' + (d + 1))) el.classList.add('sel-nr');
+  });
+}
+function deselectAll() {
+  selectedCells.clear();
+  document.querySelectorAll('.td-shift.sel-cell').forEach(c=>c.classList.remove('sel-cell'));
+  updateSelBar();
+  updatePasteHint();
+  if (selMode) toggleSelMode();
+}
+function selectAllCells() {
+  const days = daysInMonth(curYear, curMonth);
+  employees().forEach(empObj => {
+    const emp = empObj.id;
+    for (let d = 1; d <= days; d++) {
+      const k = emp + '|||' + d;
+      selectedCells.add(k);
+      const el = document.querySelector(`[data-selkey="${CSS.escape(k)}"]`);
+      if (el) el.classList.add('sel-cell');
+    }
+  });
+  updateSelBar();
+}
+function clearSelCells() {
+  if (!selectedCells.size) return;
+  appConfirm(`${selectedCells.size} Zellen wirklich löschen?`, ()=>{
+    saveSnapshot();
+    selectedCells.forEach(k => {
+      const sep = k.lastIndexOf('|||');
+      const emp = k.slice(0, sep);
+      setEntry(emp, parseInt(k.slice(sep + 3)), null);
+    });
+    deselectAll();
+    render();
+  }, {icon:'🗑'});
+}
+function applyToSelection() {
+  if (!selectedCells.size) return;
+  ms = {emp:null, day:null, hotel:null, shift:'Night', status:null, customLabel:'', customColor:'#6366f1', customOpacity:1, _multi:true};
+  document.getElementById('customLabelInput').value = '';
+  document.getElementById('customColorInput').value = '#6366f1';
+  document.getElementById('customColSwatch').style.background = '#6366f1';
+  setOpacityUI(1);
+  document.getElementById('shiftTitle').textContent = `${selectedCells.size} Zellen bearbeiten`;
+  updateFocusFromSelection();
+  document.querySelector('#shiftOv .btn-clr').style.display = 'none';
+  renderShiftHotelGrid(activeCityId);
+  document.getElementById('mHrs').value = '8';
+  refreshShift();
+  document.getElementById('shiftOv').classList.add('open');
+}
+function toggleSelMode() {
+  selMode = !selMode;
+  const btn = document.getElementById('selModeBtn');
+  btn.classList.toggle('sel-mode-active', selMode);
+  // show row-sel buttons when in sel mode
+  document.querySelector('.tbl-wrap')?.classList.toggle('sel-active', selMode);
+  if (!selMode) deselectAll();
+}
+
+function toggleRowSel(emp) {
+  const days = daysInMonth(curYear, curMonth);
+  const allSel = Array.from({length:days},(_,i)=>emp+'|||'+(i+1)).every(k=>selectedCells.has(k));
+  if (!allSel && !selMode) toggleSelMode(); // activate sel mode when selecting a row
+  for (let d=1; d<=days; d++) {
+    const k = emp+'|||'+d;
+    const el = document.querySelector(`[data-selkey="${CSS.escape(k)}"]`);
+    if (allSel) { selectedCells.delete(k); el?.classList.remove('sel-cell'); }
+    else { selectedCells.add(k); el?.classList.add('sel-cell'); }
+  }
+  updateSelBar();
+}
+
+
+// ══ COPY / PASTE / SWAP (v5) ═══════════════════════════════════════════════
+
+// ── Toast notification ──────────────────────────────────────────────────────
+function showToast(msg, type='info', dur=2500) {
+  let t = document.getElementById('_toast');
+  if (!t) {
+    t = document.createElement('div'); t.id='_toast';
+    Object.assign(t.style, {
+      position:'fixed', bottom:'76px', left:'50%', transform:'translateX(-50%)',
+      background:'#1c1c1c', border:'1px solid #555', borderRadius:'10px',
+      padding:'7px 16px', fontSize:'12px', color:'#fff', zIndex:'400',
+      opacity:'0', transition:'opacity .2s', whiteSpace:'nowrap',
+      pointerEvents:'none', fontFamily:'inherit'
+    });
+    document.body.appendChild(t);
+  }
+  const colors = {info:'#1c1c1c', ok:'#14532d', warn:'#7c2d12'};
+  t.style.background = colors[type]||colors.info;
+  t.textContent = msg; t.style.opacity='1';
+  clearTimeout(t._tid);
+  t._tid = setTimeout(()=>{ t.style.opacity='0'; }, dur);
+}
+
+// ── Copy ────────────────────────────────────────────────────────────────────
+function copySelection() {
+  if (!selectedCells.size) return;
+  const empOrder = employees();
+  // parse + sort: by employee index, then by day
+  const cells = [...selectedCells].map(k => {
+    const sep=k.lastIndexOf('|||');
+    return { emp:k.slice(0,sep), day:parseInt(k.slice(sep+3)) };
+  }).sort((a,b)=>{
+    const ei = empOrder.findIndex(e=>e.id===a.emp) - empOrder.findIndex(e=>e.id===b.emp);
+    return ei !== 0 ? ei : a.day - b.day;
+  });
+  const anchorEmpIdx = empOrder.findIndex(e=>e.id===cells[0].emp);
+  const anchorDay    = cells[0].day;
+  _clipboard = {
+    items: cells.map(c => ({
+      dEmp:  empOrder.findIndex(e=>e.id===c.emp) - anchorEmpIdx,
+      dDay:  c.day - anchorDay,
+      entry: JSON.parse(JSON.stringify(entry(c.emp, c.day)))
+    })),
+    sourceTableId: activeCityId
+  };
+  updatePasteHint();
+  showToast(`${_clipboard.items.length} Zelle${_clipboard.items.length!==1?'n':''} kopiert — Ctrl+V zum Einfügen`, 'ok');
+}
+
+function clearClipboard() {
+  _clipboard = null;
+  updatePasteHint();
+}
+
+function updatePasteHint() {
+  const ph = document.getElementById('pasteHint'); if (!ph) return;
+  if (!_clipboard) { ph.classList.add('hidden'); return; }
+  ph.classList.remove('hidden');
+  const txt = document.getElementById('pasteHintTxt');
+  const fromSameTable = _clipboard.sourceTableId === activeCityId;
+  const tableName = appData.cities[_clipboard.sourceTableId]?.name || '?';
+  txt.textContent = `${_clipboard.items.length} Zelle${_clipboard.items.length!==1?'n':''} aus ${fromSameTable?'dieser Tabelle':'"'+tableName+'"'}`;
+}
+
+// ── Paste ───────────────────────────────────────────────────────────────────
+function pasteSelection() {
+  if (!_clipboard) { showToast('Kein Inhalt in Zwischenablage', 'warn'); return; }
+  if (!selectedCells.size) { showToast('Bitte Zielzellen auswählen, dann Einfügen', 'warn'); return; }
+  const empOrder = employees();
+  // find target anchor (topmost-leftmost selected cell)
+  const targetCells = [...selectedCells].map(k => {
+    const sep=k.lastIndexOf('|||');
+    return { emp:k.slice(0,sep), day:parseInt(k.slice(sep+3)) };
+  }).sort((a,b)=>{
+    const ei = empOrder.findIndex(e=>e.id===a.emp) - empOrder.findIndex(e=>e.id===b.emp);
+    return ei !== 0 ? ei : a.day - b.day;
+  });
+  const tAnchorEmpIdx = empOrder.findIndex(e=>e.id===targetCells[0].emp);
+  const tAnchorDay    = targetCells[0].day;
+  const days = daysInMonth(curYear, curMonth);
+  saveSnapshot();
+  let pasted=0;
+  _clipboard.items.forEach(item => {
+    if (!item.entry) return;  // skip empty (null) cells
+    const tEmpIdx = tAnchorEmpIdx + item.dEmp;
+    const tDay    = tAnchorDay    + item.dDay;
+    if (tEmpIdx < 0 || tEmpIdx >= empOrder.length) return;
+    if (tDay < 1 || tDay > days) return;
+    setEntry(empOrder[tEmpIdx].id, tDay, JSON.parse(JSON.stringify(item.entry)));
+    pasted++;
+  });
+  deselectAll();
+  render();
+  showToast(`${pasted} Zelle${pasted!==1?'n':''} eingefügt`, 'ok');
+}
+
+// ── Swap ────────────────────────────────────────────────────────────────────
+// Swap schedule entries between exactly 2 employees, on the dates they have in common.
+// Atomic: all entries are collected first, then written in one pass.
+function swapSelection() {
+  // collect selected employees and their days
+  const empDays = new Map();
+  selectedCells.forEach(k => {
+    const sep=k.lastIndexOf('|||');
+    const emp=k.slice(0,sep), day=parseInt(k.slice(sep+3));
+    if (!empDays.has(emp)) empDays.set(emp, new Set());
+    empDays.get(emp).add(day);
+  });
+  if (empDays.size !== 2) {
+    showToast('Genau 2 Personen auswählen für Tauschen', 'warn'); return;
+  }
+  const [empA, empB] = [...empDays.keys()];
+  const daysA = empDays.get(empA);
+  const daysB = empDays.get(empB);
+  // swap only common days (date-driven, not positional)
+  const common = [...daysA].filter(d => daysB.has(d));
+  if (!common.length) {
+    showToast('Keine gemeinsamen Tage — bitte gleiche Tage für beide Personen wählen', 'warn'); return;
+  }
+  // collect all entries atomically before writing
+  const ops = common.map(day => ({
+    day,
+    entryA: JSON.parse(JSON.stringify(entry(empA, day))),
+    entryB: JSON.parse(JSON.stringify(entry(empB, day)))
+  }));
+  saveSnapshot();
+  ops.forEach(op => {
+    setEntry(empA, op.day, op.entryB);  // A gets B's entry
+    setEntry(empB, op.day, op.entryA);  // B gets A's entry
+  });
+  deselectAll();
+  render();
+  const aShort = employeeName(empA).split(',')[0];
+  const bShort = employeeName(empB).split(',')[0];
+  showToast(`${common.length} Tag${common.length!==1?'e':''} getauscht: ${aShort} ↔ ${bShort}`, 'ok');
+}
+
+// ══ NAV ════════════════════════════════════════════════════════════════════
+function changeMonth(d){
+  curMonth+=d;
+  if(curMonth>11){curMonth=0;curYear++;}
+  if(curMonth<0) {curMonth=11;curYear--;}
+  render();
+}
+function closeModal(id){
+  document.getElementById(id).classList.remove('open');
+  if (id === 'shiftOv') {
+    document.querySelector('#shiftOv .btn-clr').style.display = '';
+    ms._multi = false;
+    clearFocus();
+  }
+}
+
+// ══ APP CONFIRM ════════════════════════════════════════════════════════════
+let _confirmCb = null;
+function appConfirm(msg, onOk, opts={}){
+  _confirmCb = onOk;
+  document.getElementById('confirmMsg').textContent = msg;
+  // customize icon and button label
+  const icon  = opts.icon  ?? '🗑';
+  const label = opts.label ?? 'Löschen';
+  const color = opts.color ?? '#E11D48';
+  document.getElementById('confirmIcon').textContent = icon;
+  document.getElementById('confirmOkBtn').textContent = label;
+  document.getElementById('confirmOkBtn').style.background = color;
+  document.getElementById('confirmOkBtn').style.borderColor = color;
+  document.getElementById('confirmOv').classList.add('open');
+}
+function _confirmOk(){
+  document.getElementById('confirmOv').classList.remove('open');
+  if(_confirmCb){ _confirmCb(); _confirmCb=null; }
+}
+function _confirmCancel(){
+  document.getElementById('confirmOv').classList.remove('open');
+  _confirmCb = null;
+}
+
+// ══ GLOBAL EVENTS ══════════════════════════════════════════════════════════
+['shiftOv','empOv','cityOv','hotelOv','settingsOv','holidayOv','exportOv','importPreviewOv'].forEach(id=>{
+  document.getElementById(id).addEventListener('click',function(e){ if(e.target===this)closeModal(id); });
+});
+// ── drag-select / drag-deselect: global mouseup ends drag ─────────────────
+document.addEventListener('mouseup', () => {
+  if (isDragDesel) {
+    isDragDesel = false;
+    document.body.classList.remove('drag-selecting');
+    if (selectedCells.size === 0 && selMode) toggleSelMode();
+    else updateSelBar();
+    return;
+  }
+  if (isDragSel) {
+    isDragSel = false;
+    document.body.classList.remove('drag-selecting');
+    if (selectedCells.size > 0) updateSelBar();
+  }
+});
+// prevent drag-selecting from being killed by leaving the window mid-drag
+document.addEventListener('mouseleave', () => {
+  if (isDragSel) { isDragSel = false; document.body.classList.remove('drag-selecting'); }
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){
+    const opened = document.querySelectorAll('.overlay.open');
+    if(opened.length) opened.forEach(o=>o.classList.remove('open'));
+    else deselectAll();
+  }
+  // Undo: Ctrl+Z
+  if((e.ctrlKey||e.metaKey) && e.key==='z' && !e.shiftKey){
+    if(!document.querySelector('.overlay.open') && !e.target.matches('input,textarea')){
+      e.preventDefault(); undo();
+    }
+  }
+  // Redo: Ctrl+Y or Ctrl+Shift+Z
+  if((e.ctrlKey||e.metaKey) && (e.key==='y' || (e.key==='z' && e.shiftKey))){
+    if(!document.querySelector('.overlay.open') && !e.target.matches('input,textarea')){
+      e.preventDefault(); redo();
+    }
+  }
+  // Copy: Ctrl+C (only when cells selected, no modal open, not in input)
+  if((e.ctrlKey||e.metaKey) && e.key==='c'){
+    if(!document.querySelector('.overlay.open') && !e.target.matches('input,textarea') && selectedCells.size>0){
+      e.preventDefault(); copySelection();
+    }
+  }
+  // Paste: Ctrl+V
+  if((e.ctrlKey||e.metaKey) && e.key==='v'){
+    if(!document.querySelector('.overlay.open') && !e.target.matches('input,textarea') && _clipboard){
+      e.preventDefault(); pasteSelection();
+    }
+  }
+});
+
+// ── Online / Offline detection ──────────────────────────────────────────────
+window.addEventListener('online',  () => {
+  document.body.classList.remove('is-offline');
+  // T5: flush accumulated ops now that we're back online
+  SyncQueue.flush();
+});
+window.addEventListener('offline', () => document.body.classList.add('is-offline'));
+if (!navigator.onLine) document.body.classList.add('is-offline');
+
+// ══ INIT ═══════════════════════════════════════════════════════════════════
+
+(async function(){
+  // ── one-time migration: localStorage → IndexedDB (keep for legacy users) ──
+  try {
+    const legacyData = localStorage.getItem('lk3_data');
+    const legacySalt = localStorage.getItem('lk3_salt');
+    if (legacyData && !(await DB.has('data'))) {
+      await DB.set('data', JSON.parse(legacyData));
+      if (legacySalt) await DB.set('salt', JSON.parse(legacySalt));
+      localStorage.removeItem('lk3_data');
+      localStorage.removeItem('lk3_salt');
+    }
+  } catch(e) { /* non-fatal */ }
+
+  // ── Init Supabase client ───────────────────────────────────────────────────
+  _supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // ── Check for existing session (user already logged in) ────────────────────
+  const { data: { session } } = await _supa.auth.getSession();
+  if (session?.user) {
+    currentUser = { id: session.user.id, email: session.user.email };
+    await afterAuth();
+    return;
+  }
+
+  // ── Listen for auth state changes (magic-link redirect / OTP verification) ─
+  _supa.auth.onAuthStateChange(async (event, session) => {
+    if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user && !appData) {
+      currentUser = { id: session.user.id, email: session.user.email };
+      await afterAuth();
+    }
+  });
+
+  // ── No session → show OTP login screen ────────────────────────────────────
+  setTimeout(() => document.getElementById('authEmail')?.focus(), 100);
+})();
+
+// ── Service Worker registration (PWA — offline-first) ───────────────────────
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => {
+        console.log('[Calixo] SW registered — scope:', reg.scope);
+        // Check for a newer SW on every page load (triggers install if sw.js changed)
+        reg.update();
+        // When a new SW takes control, reload once to get the freshly cached HTML
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          window.location.reload();
+        });
+      })
+      .catch(e => console.warn('[Calixo] SW registration failed:', e));
+  });
+}
+
+// ── CROSSHAIR HOVER (Excel-style row + column highlight) ──────────────────
+// Attaches to #tbl (static element) — survives renderTable() re-renders.
+// Row:  highlights both tr rows for the hovered employee (main + hours pair).
+// Col:  highlights the day header th (.th-day) for the hovered day.
+// Cell: draws a 1-px outline on the hovered cell.
+(function(){
+  const tbl = document.getElementById('tbl');
+  if (!tbl) return;
+  let xRows = [], xCol = null, xCell = null;
+
+  function clearX() {
+    xRows.forEach(r => r.classList.remove('x-row'));
+    if (xCol)  xCol.classList.remove('x-col');
+    if (xCell) xCell.classList.remove('x-cell');
+    xRows = []; xCol = null; xCell = null;
+  }
+
+  tbl.addEventListener('mouseover', function(ev) {
+    const td = ev.target.closest('td, th');
+    if (!td) return;
+    const tr = td.parentElement;
+    if (!tr) return;
+
+    clearX();
+
+    // ── Highlight employee row pair (main row + hours row) ──
+    const isBody = tr.parentElement?.tagName === 'TBODY';
+    if (isBody) {
+      const siblings = Array.from(tr.parentElement.children);
+      const idx  = siblings.indexOf(tr);
+      const last = siblings.length - 1;   // sum row is always last
+      if (idx < last) {
+        const isMain = idx % 2 === 0;
+        const pairIdx = isMain ? idx + 1 : idx - 1;
+        xRows = [tr];
+        if (pairIdx >= 0 && pairIdx < last) xRows.push(siblings[pairIdx]);
+        xRows.forEach(r => r.classList.add('x-row'));
+      }
+    }
+
+    // ── Highlight day column header (.th-day) ──
+    let day = null;
+    if (td.dataset.selkey) {
+      // shift cell — data-selkey = "emp|||day"
+      day = parseInt(td.dataset.selkey.split('|||')[1]);
+    } else if (isBody) {
+      const siblings = Array.from(tr.parentElement.children);
+      const idx  = siblings.indexOf(tr);
+      const last = siblings.length - 1;
+      // hours row = odd index in tbody (and not the sum row)
+      if (idx % 2 === 1 && idx < last) {
+        day = td.cellIndex + 1;   // cellIndex 0 → day 1
+      }
+    }
+    if (day) {
+      // thead .th-day elements are ordered day 1…31
+      const ths = tbl.querySelectorAll('thead .th-day');
+      xCol = ths[day - 1] || null;
+      if (xCol) xCol.classList.add('x-col');
+    }
+
+    // ── Active cell outline ──
+    xCell = td;
+    td.classList.add('x-cell');
+  });
+
+  tbl.addEventListener('mouseleave', clearX);
+})();
+</script>
+</body>
+</html>
