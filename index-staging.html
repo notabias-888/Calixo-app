@@ -2780,6 +2780,7 @@ function permanentDeleteCity(id) {
     delete appData.cities[id];
     persist();
     renderHomeScreen();
+    touchOrgSync(); // broadcast to all org members so they remove it from their local trash
     showToast(`"${name}" endgültig gelöscht`, 'info');
   }, { icon: '🗑', label: 'Endgültig löschen', color: '#E11D48' });
 }
