@@ -1291,7 +1291,8 @@ const Supabase = {
       p_month:      op.month,
       p_day:        op.day,
       p_payload:    op.val ?? null,
-      p_updated_at: ts
+      p_updated_at: ts,
+      p_org_id:     _currentOrgId ?? null   // BATCH B: tenant isolation
     });
     if (error) console.warn('[Supabase] upsertEntry error:', error.message);
   },
@@ -1310,7 +1311,8 @@ const Supabase = {
     this._realtimeSub = _supa
       .channel('public:entries', { config: { broadcast: { self: false } } })
       // ── Schedule entry changes ─────────────────────────────────────────────
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'entries' }, (payload) => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'entries',
+          filter: _currentOrgId ? `org_id=eq.${_currentOrgId}` : undefined }, (payload) => {  // BATCH B: org filter
         const { eventType, new: nr, old: or } = payload;
         const row = eventType === 'DELETE' ? or : nr;
         if (!row || !row.city_id) return;
@@ -1458,9 +1460,11 @@ async function pullMonthFromSupabase(year, month) {
   if (!_supa || !currentUser || !appData) return;
   _loadedMonths.add(key);  // mark immediately to prevent duplicate in-flight requests
 
+  if (!_currentOrgId) { _loadedMonths.delete(key); return; }   // BATCH B: guard
   const { data, error } = await _supa
     .from('entries')
     .select('city_id, emp_id, year, month, day, payload, updated_at')
+    .eq('org_id', _currentOrgId)   // BATCH B: tenant isolation
     .eq('year', year)
     .eq('month', month);
 
@@ -1484,6 +1488,7 @@ async function pullMonthFromSupabase(year, month) {
 // Shows a spinner on the button during the fetch.
 async function pullAllFromSupabase() {
   if (!_supa || !currentUser || !appData) return;
+  if (!_currentOrgId) { console.warn('[Supabase] pullAll: org_id not loaded yet, aborting'); return; }  // BATCH B: guard
   let from = 0;
   const PAGE = 1000;
   let totalFetched = 0, totalMerged = 0;
@@ -1491,6 +1496,7 @@ async function pullAllFromSupabase() {
     const { data, error } = await _supa
       .from('entries')
       .select('city_id, emp_id, year, month, day, payload, updated_at')
+      .eq('org_id', _currentOrgId)   // BATCH B: tenant isolation
       .range(from, from + PAGE - 1);
     if (error) { console.warn('[Supabase] pullAll error:', error.message); break; }
     if (!data || data.length === 0) break;
@@ -2128,6 +2134,7 @@ async function pushAllEntriesToSupabase() {
               day:        Number(day),
               payload,
               updated_at: new Date(payload.updatedAt || Date.now()).toISOString(),
+              org_id:     _currentOrgId ?? undefined,   // BATCH B: tenant isolation
             });
           }
         }
