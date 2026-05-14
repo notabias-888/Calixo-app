@@ -149,6 +149,21 @@ body.has-staging-banner #homeScreen { top: 24px; }
 }
 .presence-dot:hover .presence-tooltip{opacity:1;}
 .presence-dot.me{opacity:.5;}
+/* ── Cell Presence: who's editing which cell ── */
+.cell-editing{
+  outline:2px solid var(--cp-color,#6366f1)!important;
+  outline-offset:-2px;
+  position:relative;
+}
+.cell-editing::before{
+  content:attr(data-cp-user);
+  position:absolute;top:0;right:0;
+  background:var(--cp-color,#6366f1);color:#fff;
+  font-size:9px;font-weight:700;
+  padding:1px 4px;border-radius:0 0 0 4px;
+  pointer-events:none;z-index:5;
+  max-width:58px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
 .presence-more{
   font-size:10px;font-weight:700;color:var(--muted);padding:0 4px;
 }
@@ -1526,9 +1541,10 @@ function touchOrgSync() {
 
 // ── Presence: real-time "who's online" via Supabase Broadcast Presence ───────
 // Uses a dedicated `presence:${orgId}` channel (separate from entries channel).
-// Each client publishes: { email, view:'home'|'table', cityId, cityName }.
+// Each client publishes: { email, view:'home'|'table', cityId, cityName, editingCell }.
 // On any state change all clients call renderPresence() to update the UI dots.
 let _presenceSub = null;
+let _lastPresenceState = {}; // cached for re-render after renderTable()
 
 function _presenceColor(email) {
   // Deterministic color from email hash — same email always = same color
@@ -1539,6 +1555,7 @@ function _presenceColor(email) {
 }
 
 function renderPresence(state) {
+  _lastPresenceState = state; // cache for re-render after renderTable()
   const users = Object.values(state).map(arr => arr[0]).filter(Boolean);
   const html = users.map(u => {
     const isMe = u.email === currentUser?.email;
@@ -1554,14 +1571,38 @@ function renderPresence(state) {
     const el = document.getElementById(id);
     if (el) el.innerHTML = html;
   });
+  renderCellPresence(state);
 }
 
-function trackPresence(view) {
+function renderCellPresence(state) {
+  // Clear existing markers
+  document.querySelectorAll('.cell-editing').forEach(el => {
+    el.classList.remove('cell-editing');
+    el.style.removeProperty('--cp-color');
+    el.removeAttribute('data-cp-user');
+  });
+  const users = Object.values(state).map(arr => arr[0]).filter(Boolean);
+  for (const u of users) {
+    if (u.email === currentUser?.email) continue; // skip self
+    if (!u.editingCell || u.cityId !== activeCityId) continue;
+    const { empId, day } = u.editingCell;
+    const selkey = `${empId}|||${day}`;
+    const el = document.querySelector(`[data-selkey="${CSS.escape(selkey)}"]`);
+    if (el) {
+      const color = _presenceColor(u.email);
+      el.style.setProperty('--cp-color', color);
+      el.setAttribute('data-cp-user', (u.email || '?').split('@')[0]);
+      el.classList.add('cell-editing');
+    }
+  }
+}
+
+function trackPresence(view, editingCell) {
   if (!_presenceSub || !currentUser) return;
   const cityId   = activeCityId || null;
   const cityObj  = cityId && appData?.cities?.[cityId];
   const cityName = cityObj?.name || cityId || null;
-  _presenceSub.track({ email: currentUser.email, view, cityId, cityName })
+  _presenceSub.track({ email: currentUser.email, view, cityId, cityName, editingCell: editingCell ?? null })
     .catch(() => {});
 }
 
@@ -3313,6 +3354,8 @@ function renderTable() {
   const tdST=rS.insertCell(); tdST.className='td-tot';
   const all=employees().reduce((s,empObj)=>s+empTotal(empObj.id),0); tdST.textContent=all>0?all.toFixed(1):'–';
   refreshSelBorders();
+  // Re-apply cell presence markers after DOM rebuild
+  if (Object.keys(_lastPresenceState).length) renderCellPresence(_lastPresenceState);
 }
 
 function updateTotals(){
@@ -3438,6 +3481,7 @@ function renderShiftHotelGrid(cityId) {
 }
 
 function openShift(emp, day) {
+  trackPresence('table', { empId: emp, day }); // broadcast cell being edited
   document.querySelector('#shiftOv .btn-clr').style.display = '';
   const e = entry(emp,day) || {};
   const saved = getCustomSaved(e.customLabel);
@@ -4934,6 +4978,7 @@ function changeMonth(d){
 function closeModal(id){
   document.getElementById(id).classList.remove('open');
   if (id === 'shiftOv') {
+    trackPresence('table', null); // release cell editing lock
     document.querySelector('#shiftOv .btn-clr').style.display = '';
     ms._multi = false;
     clearFocus();
