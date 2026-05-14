@@ -1107,6 +1107,10 @@ td.x-cell {
       <div class="msub" style="margin-top:0;">Konto</div>
       <div style="font-size:12px;color:var(--muted);margin-bottom:4px;">Angemeldet als:</div>
       <div style="font-size:13px;font-weight:600;color:var(--white);margin-bottom:16px;" id="settingsUserEmail">—</div>
+      <div class="msub" style="margin-top:16px;">Daten</div>
+      <button class="btn" style="width:100%;padding:10px;margin-bottom:8px;background:var(--dim);" onclick="reloadOrgFromServer()">
+        <i class="ti ti-cloud-download"></i> Tabellen vom Server laden
+      </button>
       <div class="msub" style="margin-top:8px;">Sitzung beenden</div>
       <button class="btn btn-danger" style="width:100%;padding:10px;" onclick="signOut()">
         <i class="ti ti-logout"></i> Abmelden
@@ -2147,14 +2151,20 @@ async function pushAllEntriesToSupabase() {
 // ── pullOrgStructureFromSupabase: fetch org for new devices (v15d) ───────────
 // Called when IndexedDB is empty. Fetches cities + employees from Supabase
 // using the user's org_id so city/employee IDs match those in entries.
-// Returns a cities object ready for appData, or null if nothing found.
+// Returns a cities object ready for appData, or null if fetch failed.
+// Returns {} if fetch succeeded but org has no cities yet.
 async function pullOrgStructureFromSupabase() {
   if (!_supa || !currentUser) return null;
 
   // Get org_id from profiles
-  const { data: prof } = await _supa
+  const { data: prof, error: pe } = await _supa
     .from('profiles').select('org_id').eq('id', currentUser.id).single();
-  if (!prof?.org_id) return null;
+  if (pe) { console.warn('[Supabase] pullOrg: profile fetch error:', pe.message); return null; }
+  if (!prof?.org_id) {
+    console.warn('[Supabase] pullOrg: no org_id for user', currentUser.id);
+    return null;
+  }
+  console.log('[Supabase] pullOrg: org_id =', prof.org_id, 'user =', currentUser.email || currentUser.id);
 
   // Fetch ACTIVE cities + employees (soft-delete: deleted_at IS NULL)
   const { data: cities, error: ce } = await _supa
@@ -2163,15 +2173,20 @@ async function pullOrgStructureFromSupabase() {
     .eq('org_id', prof.org_id)
     .is('deleted_at', null)
     .order('id');
-  if (ce) { console.warn('[Supabase] pullOrg error:', ce.message); return null; }
+  if (ce) {
+    console.warn('[Supabase] pullOrg active-cities error:', ce.message, ce.code);
+    return null;
+  }
+  console.log('[Supabase] pullOrg: active cities raw count =', (cities||[]).length);
 
   // Fetch DELETED cities (trash — shared across all org members)
-  const { data: deletedCities } = await _supa
+  const { data: deletedCities, error: de } = await _supa
     .from('cities')
     .select('id, name, city_key, hotels, deleted_at, employees(id, name, sort_order)')
     .eq('org_id', prof.org_id)
     .not('deleted_at', 'is', null)
     .order('deleted_at', { ascending: false });
+  if (de) console.warn('[Supabase] pullOrg trash-cities error:', de.message);
 
   const result = {};
   for (const city of (cities || [])) {
@@ -2198,7 +2213,12 @@ async function pullOrgStructureFromSupabase() {
     };
   }
 
-  console.log('[Supabase] pulled org:', (cities||[]).length, 'active /', (deletedCities||[]).length, 'in trash');
+  const activeCount   = (cities||[]).length;
+  const deletedCount  = (deletedCities||[]).length;
+  console.log('[Supabase] pullOrg done:', activeCount, 'active /', deletedCount, 'in trash');
+  if (activeCount === 0 && deletedCount === 0) {
+    console.warn('[Supabase] pullOrg: 0 cities total — possible RLS block or empty org');
+  }
   return result;
 }
 
@@ -2284,9 +2304,15 @@ async function mergeRemoteOrg(reconcile = false) {
   const remoteCities = await pullOrgStructureFromSupabase();
   if (!remoteCities) return;
 
-  // Guard: if remote returned zero cities entirely, bail out to avoid data wipe
+  // Guard: if remote returned zero cities, bail — but only when local has data to protect.
+  // If local is also empty the merge would add nothing anyway, so still bail.
   if (Object.keys(remoteCities).length === 0) {
-    console.warn('[mergeRemoteOrg] remote returned 0 cities — skipping to avoid data wipe');
+    const localCount = Object.keys(appData.cities || {}).length;
+    if (localCount > 0) {
+      console.warn('[mergeRemoteOrg] remote 0 cities — skipping to protect', localCount, 'local cities');
+    } else {
+      console.warn('[mergeRemoteOrg] remote 0 cities AND local empty — nothing to merge');
+    }
     return;
   }
 
@@ -2474,19 +2500,44 @@ async function afterAuth() {
   let data = null;
   if (raw) { try { data = migrate(JSON.parse(raw)); } catch(e) {} }
 
-  if (!data) {
-    // v15d: new device — pull org structure from Supabase so city/employee
-    // IDs match those in the entries table (avoids random-ID mismatch).
+  // ── v15i: handle stale empty-cities state ─────────────────────────────────
+  // Covers two cases:
+  //   A) Fresh device (data = null) — pull from Supabase
+  //   B) Stale IndexedDB has 0 active cities (e.g. previous pull returned {})
+  //      — re-pull now, before showing the app, so user isn't stuck on blank home
+  const localActiveCount = data
+    ? Object.values(data.cities || {}).filter(c => !c.deleted_at).length
+    : 0;
+  const needsRemotePull = !data || localActiveCount === 0;
+
+  if (needsRemotePull) {
+    console.log('[afterAuth] pulling org from server — local active cities:', localActiveCount);
     const remoteCities = await pullOrgStructureFromSupabase();
-    if (remoteCities) {
-      const firstCityId = Object.keys(remoteCities)[0];
-      data = {
-        version: APP_VERSION, syncVersion: 1,
-        cities: remoteCities,
-        activeCityId: firstCityId,
-        holidaySettings: { layers:['global','de','city'], colorOverrides:{}, disabled:[], events:[] },
-        customColors: {},
-      };
+    // Only use remote data if it has at least ONE active city.
+    // An empty {} from the server means either RLS block or truly empty org —
+    // in that case fall through to createDefaultAppData() so the user sees something.
+    const remoteActive = remoteCities
+      ? Object.keys(remoteCities).filter(k => !remoteCities[k].deleted_at)
+      : [];
+    if (remoteActive.length > 0) {
+      const firstCityId = remoteActive[0];
+      if (data) {
+        // Stale state: merge remote into existing local data (preserve schedule etc)
+        data.cities = { ...data.cities, ...remoteCities };
+        data.activeCityId = firstCityId;
+      } else {
+        // Fresh device
+        data = {
+          version: APP_VERSION, syncVersion: 1,
+          cities: remoteCities,
+          activeCityId: firstCityId,
+          holidaySettings: { layers:['global','de','city'], colorOverrides:{}, disabled:[], events:[] },
+          customColors: {},
+        };
+      }
+    } else if (remoteCities !== null && !data) {
+      // Pull succeeded but org is empty AND no local data — use default
+      console.log('[afterAuth] server returned 0 active cities; using default app data');
     }
   }
 
@@ -2825,6 +2876,53 @@ async function signOut() {
   document.getElementById('authScreen').style.display = 'flex';
   showOTPRequest();
   authErr('');
+}
+
+// ── reloadOrgFromServer: force-pull all org cities from Supabase (v15i) ──────
+// "Tabellen vom Server laden" — recovers empty-dashboard state for second devices
+async function reloadOrgFromServer() {
+  if (!_supa || !currentUser || !appData) return;
+  const btn = document.querySelector('[onclick="reloadOrgFromServer()"]');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="auth-spinner"></span> Wird geladen…'; }
+
+  const remoteCities = await pullOrgStructureFromSupabase();
+  const remoteActive = remoteCities
+    ? Object.keys(remoteCities).filter(k => !remoteCities[k].deleted_at)
+    : [];
+
+  if (btn) {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="ti ti-cloud-download"></i> Tabellen vom Server laden';
+  }
+
+  if (!remoteCities) {
+    alert('Fehler: Server nicht erreichbar. Bitte Verbindung prüfen.');
+    return;
+  }
+  if (remoteActive.length === 0) {
+    // Nothing on the server — show diagnostic info in console
+    console.warn('[reloadOrgFromServer] Server returned 0 active cities. Check Supabase RLS policies for cities table.');
+    alert('Server hat keine Tabellen für diese Organisation.\nBitte in der Supabase-Konsole prüfen, ob die org_id korrekt gesetzt ist.\n\nDetails: Konsole (F12) öffnen und nach "[Supabase] pullOrg" suchen.');
+    return;
+  }
+
+  // Merge: add any remote cities that don't exist locally
+  let added = 0;
+  for (const [id, city] of Object.entries(remoteCities)) {
+    if (!appData.cities[id]) {
+      appData.cities[id] = city;
+      added++;
+    }
+  }
+  // Ensure activeCityId points to a valid city
+  if (!activeCityId || !appData.cities[activeCityId] || appData.cities[activeCityId].deleted_at) {
+    activeCityId = remoteActive[0];
+    appData.activeCityId = activeCityId;
+  }
+  await persist();
+  closeModal('settingsOv');
+  renderHomeScreen();
+  console.log('[reloadOrgFromServer] added', added, 'cities from server; total:', Object.keys(appData.cities).length);
 }
 
 // ══ MIGRATION ══════════════════════════════════════════════════════════════
