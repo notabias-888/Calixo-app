@@ -1188,8 +1188,8 @@ const APP_VERSION = 15;
 // ⚠ STAGING ENVIRONMENT — DO NOT USE PRODUCTION DATA HERE
 // Create a new project at supabase.com → paste URL + anon key below
 // Production project: pzutzvclegbzwveunzmy (DO NOT USE IN STAGING)
-const SUPABASE_URL      = 'https://qywcpndzdvbnovgyveqe.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_tg3oDThGPhQ6gX0wUV0Exg_zUfgiuJt';
+const SUPABASE_URL      = 'STAGING_SUPABASE_URL_HERE';
+const SUPABASE_ANON_KEY = 'STAGING_SUPABASE_ANON_KEY_HERE';
 const IS_STAGING = true; // used for staging banner + extra logging
 let _supa = null;          // Supabase client — initialised in INIT
 let currentUser = null;    // { id, email } — set after successful auth
@@ -2115,27 +2115,49 @@ async function pullOrgStructureFromSupabase() {
     .from('profiles').select('org_id').eq('id', currentUser.id).single();
   if (!prof?.org_id) return null;
 
-  // Fetch cities + employees in ONE request via embedded select (eliminates N+1)
+  // Fetch ACTIVE cities + employees (soft-delete: deleted_at IS NULL)
   const { data: cities, error: ce } = await _supa
     .from('cities')
-    .select('id, name, city_key, hotels, employees(id, name, sort_order)')
+    .select('id, name, city_key, hotels, deleted_at, employees(id, name, sort_order)')
     .eq('org_id', prof.org_id)
+    .is('deleted_at', null)
     .order('id');
-  if (ce || !cities || cities.length === 0) return null;
+  if (ce) { console.warn('[Supabase] pullOrg error:', ce.message); return null; }
+
+  // Fetch DELETED cities (trash — shared across all org members)
+  const { data: deletedCities } = await _supa
+    .from('cities')
+    .select('id, name, city_key, hotels, deleted_at, employees(id, name, sort_order)')
+    .eq('org_id', prof.org_id)
+    .not('deleted_at', 'is', null)
+    .order('deleted_at', { ascending: false });
 
   const result = {};
-  for (const city of cities) {
+  for (const city of (cities || [])) {
     const emps = (city.employees || []).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
     result[city.id] = {
-      name:      city.name,
-      cityKey:   city.city_key || city.name.toLowerCase(),
-      employees: emps.map(e => ({ id: e.id, name: e.name })),
-      schedule:  {},
-      hotels:    city.hotels || JSON.parse(JSON.stringify(DEFAULT_HOTELS)),
+      name:       city.name,
+      cityKey:    city.city_key || city.name.toLowerCase(),
+      employees:  emps.map(e => ({ id: e.id, name: e.name })),
+      schedule:   {},
+      hotels:     city.hotels || JSON.parse(JSON.stringify(DEFAULT_HOTELS)),
+      deleted_at: null,
+    };
+  }
+  // Merge deleted cities (for trash section — visible to all org members)
+  for (const city of (deletedCities || [])) {
+    const emps = (city.employees || []).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+    result[city.id] = {
+      name:       city.name,
+      cityKey:    city.city_key || city.name.toLowerCase(),
+      employees:  emps.map(e => ({ id: e.id, name: e.name })),
+      schedule:   {},
+      hotels:     city.hotels || JSON.parse(JSON.stringify(DEFAULT_HOTELS)),
+      deleted_at: new Date(city.deleted_at).getTime(),
     };
   }
 
-  console.log('[Supabase] pulled org:', Object.keys(result).length, 'cities (single JOIN)');
+  console.log('[Supabase] pulled org:', (cities||[]).length, 'active /', (deletedCities||[]).length, 'in trash');
   return result;
 }
 
@@ -2147,9 +2169,10 @@ async function pullOrgStructureFromSupabase() {
 function deduplicateCities() {
   if (!appData?.cities) return false;
 
-  // Group city IDs by lowercase name
+  // Group city IDs by lowercase name (skip soft-deleted cities)
   const groups = {};
   for (const [id, c] of Object.entries(appData.cities)) {
+    if (c.deleted_at) continue; // soft-deleted cities are not deduplicated
     const key = (c.name || '').toLowerCase().trim();
     if (!key) continue;
     if (!groups[key]) groups[key] = [];
@@ -2233,6 +2256,20 @@ async function mergeRemoteOrg(reconcile = false) {
   }
 
   let changed = false;
+
+  // Sync deleted_at from remote: if a city was soft-deleted/restored on another device
+  for (const [remoteId, remote] of Object.entries(remoteCities)) {
+    if (appData.cities[remoteId] && remote.deleted_at !== undefined) {
+      const localDeletedAt  = appData.cities[remoteId].deleted_at;
+      const remoteDeletedAt = remote.deleted_at; // null or ms timestamp
+      if (localDeletedAt !== remoteDeletedAt) {
+        appData.cities[remoteId].deleted_at = remoteDeletedAt;
+        changed = true;
+        console.log('[mergeRemoteOrg] synced deleted_at for city:', remoteId,
+          remoteDeletedAt ? 'soft-deleted' : 'restored');
+      }
+    }
+  }
   for (const [remoteId, remote] of Object.entries(remoteCities)) {
     const nameKey       = (remote.name || '').toLowerCase().trim();
     const localIdByName = localNameMap[nameKey];
@@ -2355,6 +2392,7 @@ async function syncOrgStructure() {
       name:       c.name || cityId,
       city_key:   c.cityKey || null,
       hotels:     c.hotels  || {},
+      deleted_at: c.deleted_at ? new Date(c.deleted_at).toISOString() : null,
       updated_at: now
     }, { onConflict: 'id' });
     if (ce) { console.warn('[Supabase] city upsert error:', ce.message); continue; }
@@ -2473,12 +2511,14 @@ async function skipMigration() {
 
 function showApp() {
   document.getElementById('authScreen').style.display = 'none';
-  activeCityId = appData.activeCityId || Object.keys(appData.cities)[0];
+  // activeCityId must point to a non-deleted city
+  activeCityId = (appData.activeCityId && !appData.cities[appData.activeCityId]?.deleted_at)
+    ? appData.activeCityId
+    : Object.keys(appData.cities).find(k => !appData.cities[k].deleted_at) || null;
   undoStack = []; redoStack = [];
   // Restore Lamport clock from persisted state — ensures we never regress on reload
   _lamport = Math.max(appData._lamport || 0, Date.now());
-  // Purge expired trash entries on every app start
-  if (!appData.trash) appData.trash = {};
+  // Purge cities that have been in soft-delete trash for > 30 days
   purgeTrashedCities();
   updateThemeBtn();
   // Init openCityIds for existing users who don't have it yet
@@ -2561,8 +2601,8 @@ function renderHomeScreen() {
   if (!grid) return;
   grid.innerHTML = '';
 
-  // One card per city
-  Object.entries(appData.cities).forEach(([id, c]) => {
+  // One card per city (exclude soft-deleted)
+  Object.entries(appData.cities).filter(([, c]) => !c.deleted_at).forEach(([id, c]) => {
     const empCount = (c.employees || []).length;
     const hotelCount = Object.keys(c.hotels || {}).length;
     const card = document.createElement('div');
@@ -2593,56 +2633,59 @@ function renderHomeScreen() {
   renderTrashSection();
 }
 
-// ── Trash bin: 30-day local archive for deleted cities ───────────────────────
+// ── Trash bin: 30-day soft-delete (server-side, shared across org) ───────────
 const TRASH_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 let _trashOpen = false; // UI state — collapsed by default
 
 function purgeTrashedCities() {
-  if (!appData?.trash) return;
+  if (!appData?.cities) return;
   const now = Date.now();
   let changed = false;
-  for (const [id, entry] of Object.entries(appData.trash)) {
-    if (now - entry.deletedAt > TRASH_TTL_MS) {
-      delete appData.trash[id];
+  for (const [id, c] of Object.entries(appData.cities)) {
+    if (!c.deleted_at) continue;
+    if (now - c.deleted_at > TRASH_TTL_MS) {
+      // Permanently delete from Supabase after 30-day TTL
+      if (_supa && currentUser && navigator.onLine) {
+        _supa.from('cities').delete().eq('id', id).then(() => {});
+      }
+      delete appData.cities[id];
       changed = true;
-      console.log('[Trash] auto-purged:', entry.city?.name, id);
+      console.log('[Trash] auto-purged after 30 days:', c.name, id);
     }
   }
   if (changed) persist();
 }
 
 function moveToTrash(id) {
-  if (!appData?.trash) appData.trash = {};
-  appData.trash[id] = {
-    city: JSON.parse(JSON.stringify(appData.cities[id])),
-    deletedAt: Date.now(),
-  };
+  // Soft-delete: mark deleted_at instead of removing from appData
+  if (!appData?.cities?.[id]) return;
+  appData.cities[id].deleted_at = Date.now();
 }
 
 function restoreCity(id) {
-  if (!appData?.trash?.[id]) return;
-  const entry = appData.trash[id];
-  // Avoid name collision — append "(Wiederhergestellt)" if name exists
-  const existingNames = Object.values(appData.cities).map(c => c.name.toLowerCase());
-  let name = entry.city.name;
-  if (existingNames.includes(name.toLowerCase())) name += ' (Wiederhergestellt)';
-  entry.city.name = name;
-  // Give it a fresh local ID to avoid collision
-  const newId = 'c_' + Date.now();
-  appData.cities[newId] = entry.city;
-  delete appData.trash[id];
+  if (!appData?.cities?.[id]) return;
+  const name = appData.cities[id].name || id;
+  // Clear soft-delete flag
+  appData.cities[id].deleted_at = null;
   persist();
   renderHomeScreen();
-  // Push restored city to Supabase
+  // Restore in Supabase
+  if (_supa && currentUser && navigator.onLine) {
+    _supa.from('cities').update({ deleted_at: null }).eq('id', id).then(() => {});
+  }
   touchOrgSync();
   showToast(`"${name}" wiederhergestellt`, 'ok');
 }
 
 function permanentDeleteCity(id) {
-  if (!appData?.trash?.[id]) return;
-  const name = appData.trash[id].city?.name || id;
+  if (!appData?.cities?.[id]) return;
+  const name = appData.cities[id].name || id;
   appConfirm(`"${name}" endgültig löschen? Diese Aktion kann nicht rückgängig gemacht werden.`, () => {
-    delete appData.trash[id];
+    // Real DELETE from Supabase
+    if (_supa && currentUser && navigator.onLine) {
+      _supa.from('cities').delete().eq('id', id).then(() => {});
+    }
+    delete appData.cities[id];
     persist();
     renderHomeScreen();
     showToast(`"${name}" endgültig gelöscht`, 'info');
@@ -2653,7 +2696,8 @@ function renderTrashSection() {
   const section = document.getElementById('trashSection');
   if (!section) return;
   purgeTrashedCities();
-  const entries = Object.entries(appData.trash || {});
+  // Read deleted cities from appData.cities (server-side soft delete, shared across org)
+  const entries = Object.entries(appData.cities || {}).filter(([, c]) => c.deleted_at);
   if (entries.length === 0) { section.style.display = 'none'; return; }
   section.style.display = 'block';
 
@@ -2666,11 +2710,11 @@ function renderTrashSection() {
 
   if (_trashOpen) {
     html += '<div class="trash-grid">';
-    for (const [id, entry] of entries) {
-      const name = entry.city?.name || id;
-      const empCount = (entry.city?.employees || []).length;
-      const daysLeft = Math.max(0, Math.ceil((entry.deletedAt + TRASH_TTL_MS - Date.now()) / 86400000));
-      const deletedDate = new Date(entry.deletedAt).toLocaleDateString('de-DE');
+    for (const [id, c] of entries) {
+      const name = c.name || id;
+      const empCount = (c.employees || []).length;
+      const daysLeft = Math.max(0, Math.ceil((c.deleted_at + TRASH_TTL_MS - Date.now()) / 86400000));
+      const deletedDate = new Date(c.deleted_at).toLocaleDateString('de-DE');
       html += `
         <div class="trash-card">
           <div class="trash-card-icon"><i class="ti ti-trash" style="color:#dc2626;"></i></div>
@@ -3681,16 +3725,16 @@ function showCardContextMenu(e, cityId) {
 function closeContextMenu() { document.getElementById('ctxMenu')?.remove(); }
 
 function deleteCityFromHome(id) {
-  const keys = Object.keys(appData.cities);
-  if (keys.length <= 1) { alert('Mindestens eine Tabelle muss vorhanden sein'); return; }
+  const activeCities = Object.values(appData.cities).filter(c => !c.deleted_at);
+  if (activeCities.length <= 1) { alert('Mindestens eine Tabelle muss vorhanden sein'); return; }
   const cityName = appData.cities[id]?.name || id;
   appConfirm(`"${cityName}" in den Papierkorb verschieben?`, () => {
-    const empIds = (appData.cities[id]?.employees || []).map(e => e.id);
-    moveToTrash(id); // save copy to local trash before deleting
+    moveToTrash(id); // soft-delete: sets deleted_at timestamp
     if (appData.openCityIds) appData.openCityIds = appData.openCityIds.filter(x => x !== id);
-    delete appData.cities[id];
-    if (activeCityId === id) activeCityId = Object.keys(appData.cities)[0];
-    appData.activeCityId = activeCityId;
+    if (activeCityId === id) {
+      activeCityId = Object.keys(appData.cities).find(k => !appData.cities[k].deleted_at) || null;
+      appData.activeCityId = activeCityId;
+    }
     persist();
     // Return to home screen
     document.getElementById('app').style.display = 'none';
@@ -3698,11 +3742,11 @@ function deleteCityFromHome(id) {
     renderHomeScreen();
     trackPresence('home');
     showToast(`"${cityName}" in Papierkorb verschoben`, 'info');
-    // Delete from Supabase immediately — trash is local only, not in DB
+    // Soft-delete in Supabase — set deleted_at instead of hard DELETE
     if (_supa && currentUser && navigator.onLine) {
-      const deletes = empIds.map(eid => _supa.from('employees').delete().eq('id', eid));
-      deletes.push(_supa.from('cities').delete().eq('id', id));
-      Promise.allSettled(deletes).then(() => touchOrgSync());
+      const nowIso = new Date().toISOString();
+      _supa.from('cities').update({ deleted_at: nowIso }).eq('id', id)
+        .then(() => touchOrgSync());
     } else {
       touchOrgSync();
     }
@@ -3710,21 +3754,23 @@ function deleteCityFromHome(id) {
 }
 
 function deleteCity(id){
-  const keys=Object.keys(appData.cities);
-  if(keys.length<=1){ alert('Mindestens eine Tabelle muss vorhanden sein'); return; }
+  const activeCities = Object.values(appData.cities).filter(c => !c.deleted_at);
+  if(activeCities.length<=1){ alert('Mindestens eine Tabelle muss vorhanden sein'); return; }
   const cityName = appData.cities[id]?.name || id;
   appConfirm(`"${cityName}" in den Papierkorb verschieben?`, ()=>{
-    const empIds = (appData.cities[id]?.employees || []).map(e => e.id);
-    moveToTrash(id);
-    delete appData.cities[id];
-    if(activeCityId===id){ activeCityId=Object.keys(appData.cities)[0]; appData.activeCityId=activeCityId; }
+    moveToTrash(id); // soft-delete: sets deleted_at timestamp
+    if(activeCityId===id){
+      activeCityId = Object.keys(appData.cities).find(k => !appData.cities[k].deleted_at) || null;
+      appData.activeCityId = activeCityId;
+    }
     persist();
     showHomeScreen();
     showToast(`"${cityName}" in Papierkorb verschoben`, 'info');
+    // Soft-delete in Supabase
     if (_supa && currentUser && navigator.onLine) {
-      const deletes = empIds.map(eid => _supa.from('employees').delete().eq('id', eid));
-      deletes.push(_supa.from('cities').delete().eq('id', id));
-      Promise.allSettled(deletes).then(() => touchOrgSync());
+      const nowIso = new Date().toISOString();
+      _supa.from('cities').update({ deleted_at: nowIso }).eq('id', id)
+        .then(() => touchOrgSync());
     } else {
       touchOrgSync();
     }
