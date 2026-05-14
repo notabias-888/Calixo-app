@@ -1311,11 +1311,14 @@ const Supabase = {
     this._realtimeSub = _supa
       .channel('public:entries', { config: { broadcast: { self: false } } })
       // ── Schedule entry changes ─────────────────────────────────────────────
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'entries',
-          filter: _currentOrgId ? `org_id=eq.${_currentOrgId}` : undefined }, (payload) => {  // BATCH B: org filter
+      // BATCH B: server-side filter removed — requires REPLICA IDENTITY FULL which isn't set.
+      // Client-side org guard below. After BATCH C (RLS), server enforces isolation anyway.
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'entries' }, (payload) => {
         const { eventType, new: nr, old: or } = payload;
         const row = eventType === 'DELETE' ? or : nr;
         if (!row || !row.city_id) return;
+        // Org isolation: skip events from other orgs (client-side guard, RLS will handle this after BATCH C)
+        if (_currentOrgId && row.org_id && row.org_id !== _currentOrgId) return;
         // Echo suppression: skip changes we sent ourselves
         const echoKey = `${row.city_id}|${row.emp_id}|${row.year}|${row.month}|${row.day}|${row.updated_at}`;
         if (this._ownWrites.has(echoKey)) return;
